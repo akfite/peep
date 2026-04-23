@@ -482,11 +482,11 @@ TEST(Render, DifferentColormapsProduceDifferentOutput) {
 TEST(Render, EnumColormapMatchesStringColormap) {
     double data[] = {0.0, 0.5, 1.0, 0.25};
     EXPECT_EQ(render_to_string(data, 2, 2, Options().colormap("gray")),
-              render_to_string(data, 2, 2, Options().colormap(Colormap::Gray)));
+        render_to_string(data, 2, 2, Options().colormap(Colormap::Gray)));
     EXPECT_EQ(render_to_string(data, 2, 2, Options().colormap("magma")),
-              render_to_string(data, 2, 2, Options().colormap(Colormap::Magma)));
+        render_to_string(data, 2, 2, Options().colormap(Colormap::Magma)));
     EXPECT_EQ(render_to_string(data, 2, 2, Options().colormap("viridis")),
-              render_to_string(data, 2, 2, Options().colormap(Colormap::Viridis)));
+        render_to_string(data, 2, 2, Options().colormap(Colormap::Viridis)));
 }
 
 TEST(Render, UnknownColormapUsesGray) {
@@ -541,7 +541,7 @@ TEST(Render, LargeMatrixDoesNotCrash) {
     for (int i = 0; i < rows * cols; i++)
         data[i] = std::sin(static_cast<double>(i) * 0.01);
     std::string out = render_to_string(data.data(), rows, cols,
-                                       Options().colormap("viridis").block_size(1));
+        Options().colormap("viridis").block_size(1));
     EXPECT_FALSE(out.empty());
     int newlines = 0;
     for (char ch : out) if (ch == '\n') newlines++;

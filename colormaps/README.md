@@ -4,4 +4,4 @@ Each colormap is stored as a binary file containing 256 RGB triplets.  The tripl
 
 ## Deployment
 
-Use `embed_assets.py` to generate a header file that embeds the info in each binary file into the source code.
+Use `scripts/embed_assets.py` to generate a header file that embeds the info in each binary file into source code.

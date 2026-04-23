@@ -18,7 +18,7 @@ if(TERMIMAGE_BUILD_EXAMPLES)
 endif()
 
 # --- Tests -------------------------------------------------------------------
-option(TERMIMAGE_BUILD_TESTS "Build unit tests" ON)
+option(TERMIMAGE_BUILD_TESTS "Build unit tests" OFF)
 
 if(TERMIMAGE_BUILD_TESTS)
     include(FetchContent)

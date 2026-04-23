@@ -1,11 +1,10 @@
-// termimage.h -- terminal matrix visualizer (header-only, C++11)
-//
 // Usage:
+//
 //   #include "termimage.h"
 //
 //   double data[] = {0, 1, 2, 3, 4, 5};
 //   termimage::print(data, 2, 3);
-//   termimage::print(data, 2, 3, termimage::Options().colormap("magma").block_size(2));
+//   termimage::print(data, 2, 3, termimage::Options().colormap("magma").block_size(3));
 //
 
 #ifndef TERMIMAGE_H
@@ -20,15 +19,12 @@
 
 namespace termimage {
 
-// ---- Public types ----------------------------------------------------------
-
 enum class Layout { RowMajor, ColMajor };
-
 enum class Colormap { Gray, Magma, Viridis };
 
 struct Options {
     Options()
-        : clim_lo_(NAN), clim_hi_(NAN), colormap_(Colormap::Gray),
+        : clim_lo_(NAN), clim_hi_(NAN), colormap_(Colormap::Viridis),
         block_size_(1), layout_(Layout::RowMajor), out_(&std::cout),
         crop_r0_(0), crop_c0_(0), crop_h_(-1), crop_w_(-1) {}
 
@@ -50,8 +46,8 @@ struct Options {
     Options& clim_hi(double v) { clim_hi_ = v; return *this; }
     Options& colormap(Colormap c) { colormap_ = c; return *this; }
     Options& colormap(const std::string& name) {
-        if (name == "magma") colormap_ = Colormap::Magma;
-        else if (name == "viridis") colormap_ = Colormap::Viridis;
+        if (name == "viridis") colormap_ = Colormap::Viridis;
+        else if (name == "magma") colormap_ = Colormap::Magma;
         else colormap_ = Colormap::Gray;
         return *this;
     }
@@ -85,13 +81,11 @@ private:
     int crop_w_;
 };
 
-// ---- Public API ------------------------------------------------------------
-
+// public API
 template <typename T>
 void print(const T* data, int rows, int cols, const Options& opts = Options());
 
-// ---- Implementation (detail) -----------------------------------------------
-
+// internal API
 namespace detail {
 
 struct RGB { unsigned char r, g, b; };
@@ -249,8 +243,7 @@ void render(const T* data, int rows, int cols, const Options& opts) {
 
 } // namespace detail
 
-// ---- Template definition ---------------------------------------------------
-
+// template definition
 template <typename T>
 void print(const T* data, int rows, int cols, const Options& opts) {
     detail::render(data, rows, cols, opts);
