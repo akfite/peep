@@ -22,33 +22,42 @@ namespace termimage {
 
 // ---- Public types ----------------------------------------------------------
 
-enum Layout { ROW_MAJOR, COL_MAJOR };
+enum class Layout { RowMajor, ColMajor };
+
+enum class Colormap { Gray, Magma, Viridis };
 
 struct Options {
-    double clim_lo_;
-    double clim_hi_;
-    std::string colormap_;
-    int block_size_;
-    Layout layout_;
-    std::ostream* out_;
-    int crop_r0_;
-    int crop_c0_;
-    int crop_h_;
-    int crop_w_;
-
     Options()
-        : clim_lo_(NAN), clim_hi_(NAN), colormap_("gray"),
-        block_size_(1), layout_(ROW_MAJOR), out_(&std::cout),
+        : clim_lo_(NAN), clim_hi_(NAN), colormap_(Colormap::Gray),
+        block_size_(1), layout_(Layout::RowMajor), out_(&std::cout),
         crop_r0_(0), crop_c0_(0), crop_h_(-1), crop_w_(-1) {}
+
+    // Getters
+    double clim_lo() const { return clim_lo_; }
+    double clim_hi() const { return clim_hi_; }
+    Colormap colormap() const { return colormap_; }
+    int block_size() const { return block_size_; }
+    Layout layout() const { return layout_; }
+    std::ostream& ostream() const { return *out_; }
+    int crop_r0() const { return crop_r0_; }
+    int crop_c0() const { return crop_c0_; }
+    int crop_h() const { return crop_h_; }
+    int crop_w() const { return crop_w_; }
 
     // Chainable setters
     Options& clim(double lo, double hi) { clim_lo_ = lo; clim_hi_ = hi; return *this; }
     Options& clim_lo(double v) { clim_lo_ = v; return *this; }
     Options& clim_hi(double v) { clim_hi_ = v; return *this; }
-    Options& colormap(const std::string& name) { colormap_ = name; return *this; }
+    Options& colormap(Colormap c) { colormap_ = c; return *this; }
+    Options& colormap(const std::string& name) {
+        if (name == "magma") colormap_ = Colormap::Magma;
+        else if (name == "viridis") colormap_ = Colormap::Viridis;
+        else colormap_ = Colormap::Gray;
+        return *this;
+    }
     Options& block_size(int s) { block_size_ = s; return *this; }
     Options& layout(Layout l) { layout_ = l; return *this; }
-    Options& out(std::ostream& os) { out_ = &os; return *this; }
+    Options& ostream(std::ostream& os) { out_ = &os; return *this; }
 
     // Crop: from (r0, c0) to end of matrix
     Options& crop(int r0, int c0) {
@@ -62,6 +71,18 @@ struct Options {
         crop_h_ = h; crop_w_ = w;
         return *this;
     }
+
+private:
+    double clim_lo_;
+    double clim_hi_;
+    Colormap colormap_;
+    int block_size_;
+    Layout layout_;
+    std::ostream* out_;
+    int crop_r0_;
+    int crop_c0_;
+    int crop_h_;
+    int crop_w_;
 };
 
 // ---- Public API ------------------------------------------------------------
@@ -80,6 +101,14 @@ inline const unsigned char* find_colormap(const std::string& name) {
         if (name == CMAP_NAMES[i]) return CMAP_DATA[i];
     }
     return CMAP_GRAY;
+}
+
+inline const unsigned char* find_colormap(Colormap cmap) {
+    switch (cmap) {
+        case Colormap::Magma:   return CMAP_MAGMA;
+        case Colormap::Viridis: return CMAP_VIRIDIS;
+        default:                return CMAP_GRAY;
+    }
 }
 
 inline RGB lookup(double normalized, const unsigned char* cmap) {
@@ -119,17 +148,17 @@ template <typename T>
 void render(const T* data, int rows, int cols, const Options& opts) {
     if (rows <= 0 || cols <= 0) return;
 
-    const unsigned char* cmap = find_colormap(opts.colormap_);
-    std::ostream& os = *opts.out_;
-    const int bs = opts.block_size_ > 0 ? opts.block_size_ : 1;
-    const bool col_major = (opts.layout_ == COL_MAJOR);
+    const unsigned char* cmap = find_colormap(opts.colormap());
+    std::ostream& os = opts.ostream();
+    const int bs = opts.block_size() > 0 ? opts.block_size() : 1;
+    const bool col_major = (opts.layout() == Layout::ColMajor);
 
     // Resolve crop window
-    int r0 = opts.crop_r0_ < 0 ? 0 : opts.crop_r0_;
-    int c0 = opts.crop_c0_ < 0 ? 0 : opts.crop_c0_;
+    int r0 = opts.crop_r0() < 0 ? 0 : opts.crop_r0();
+    int c0 = opts.crop_c0() < 0 ? 0 : opts.crop_c0();
     if (r0 >= rows || c0 >= cols) return;
-    int vr = (opts.crop_h_ < 0) ? (rows - r0) : opts.crop_h_;
-    int vc = (opts.crop_w_ < 0) ? (cols - c0) : opts.crop_w_;
+    int vr = (opts.crop_h() < 0) ? (rows - r0) : opts.crop_h();
+    int vc = (opts.crop_w() < 0) ? (cols - c0) : opts.crop_w();
     if (r0 + vr > rows) vr = rows - r0;
     if (c0 + vc > cols) vc = cols - c0;
     if (vr <= 0 || vc <= 0) return;
@@ -143,8 +172,8 @@ void render(const T* data, int rows, int cols, const Options& opts) {
     };
 
     // Compute clim from visible region only
-    double lo = opts.clim_lo_;
-    double hi = opts.clim_hi_;
+    double lo = opts.clim_lo();
+    double hi = opts.clim_hi();
     bool auto_lo = std::isnan(lo);
     bool auto_hi = std::isnan(hi);
 
