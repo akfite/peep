@@ -4,15 +4,14 @@
 //   #include "termimage.h"
 //
 //   double data[] = {0, 1, 2, 3, 4, 5};
-//   termimage::print(data, 2, 3);  // 2 rows x 3 cols
+//   termimage::print(data, 2, 3);
+//   termimage::print(data, 2, 3, termimage::Options().colormap("magma").block_size(2));
 //
-// See termimage::Options for colormap, clim, cell_width, layout, etc.
 
 #ifndef TERMIMAGE_H
 #define TERMIMAGE_H
 
 #include <cmath>
-#include <cstring>
 #include <iostream>
 #include <limits>
 #include <string>
@@ -26,29 +25,47 @@ namespace termimage {
 enum Layout { ROW_MAJOR, COL_MAJOR };
 
 struct Options {
-    double clim_lo;        // color-axis lower bound (NAN = auto)
-    double clim_hi;        // color-axis upper bound (NAN = auto)
-    std::string colormap;  // "gray", "magma", "viridis"
-    int cell_width;        // terminal columns per matrix element
-    Layout layout;         // memory layout of the data pointer
-    std::ostream* out;     // output stream
+    double clim_lo_;
+    double clim_hi_;
+    std::string colormap_;
+    int block_size_;
+    Layout layout_;
+    std::ostream* out_;
+    int crop_r0_;
+    int crop_c0_;
+    int crop_h_;
+    int crop_w_;
 
     Options()
-        : clim_lo(NAN)
-        , clim_hi(NAN)
-        , colormap("gray")
-        , cell_width(1)
-        , layout(ROW_MAJOR)
-        , out(&std::cout) {}
+        : clim_lo_(NAN), clim_hi_(NAN), colormap_("gray"),
+        block_size_(1), layout_(ROW_MAJOR), out_(&std::cout),
+        crop_r0_(0), crop_c0_(0), crop_h_(-1), crop_w_(-1) {}
+
+    // Chainable setters
+    Options& clim(double lo, double hi) { clim_lo_ = lo; clim_hi_ = hi; return *this; }
+    Options& clim_lo(double v) { clim_lo_ = v; return *this; }
+    Options& clim_hi(double v) { clim_hi_ = v; return *this; }
+    Options& colormap(const std::string& name) { colormap_ = name; return *this; }
+    Options& block_size(int s) { block_size_ = s; return *this; }
+    Options& layout(Layout l) { layout_ = l; return *this; }
+    Options& out(std::ostream& os) { out_ = &os; return *this; }
+
+    // Crop: from (r0, c0) to end of matrix
+    Options& crop(int r0, int c0) {
+        crop_r0_ = r0; crop_c0_ = c0;
+        crop_h_ = -1; crop_w_ = -1;
+        return *this;
+    }
+    // Crop: from (r0, c0) with explicit size h x w
+    Options& crop(int r0, int c0, int h, int w) {
+        crop_r0_ = r0; crop_c0_ = c0;
+        crop_h_ = h; crop_w_ = w;
+        return *this;
+    }
 };
 
 // ---- Public API ------------------------------------------------------------
 
-/// Print a 2D numeric array to the terminal as a colorized image.
-/// @param data   Pointer to contiguous numeric data (any type castable to double).
-/// @param rows   Number of rows in the matrix.
-/// @param cols   Number of columns in the matrix.
-/// @param opts   Display options (colormap, clim, cell_width, layout, ...).
 template <typename T>
 void print(const T* data, int rows, int cols, const Options& opts = Options());
 
@@ -62,15 +79,15 @@ inline const unsigned char* find_colormap(const std::string& name) {
     for (int i = 0; i < CMAP_COUNT; ++i) {
         if (name == CMAP_NAMES[i]) return CMAP_DATA[i];
     }
-    return CMAP_GRAY;  // fallback
+    return CMAP_GRAY;
 }
 
 inline RGB lookup(double normalized, const unsigned char* cmap) {
-    int idx = static_cast<int>(normalized * 255.0 + 0.5);  // round
+    int idx = static_cast<int>(normalized * 255.0 + 0.5);
     if (idx < 0) idx = 0;
     if (idx > 255) idx = 255;
     RGB c;
-    c.r = cmap[idx * 3 + 0];
+    c.r = cmap[idx * 3];
     c.g = cmap[idx * 3 + 1];
     c.b = cmap[idx * 3 + 2];
     return c;
@@ -78,119 +95,121 @@ inline RGB lookup(double normalized, const unsigned char* cmap) {
 
 inline void emit_bg(std::ostream& os, RGB c) {
     os << "\x1b[48;2;"
-       << static_cast<int>(c.r) << ';'
-       << static_cast<int>(c.g) << ';'
-       << static_cast<int>(c.b) << 'm';
+        << static_cast<int>(c.r) << ';'
+        << static_cast<int>(c.g) << ';'
+        << static_cast<int>(c.b) << 'm';
 }
 
 inline void emit_fg(std::ostream& os, RGB c) {
     os << "\x1b[38;2;"
-       << static_cast<int>(c.r) << ';'
-       << static_cast<int>(c.g) << ';'
-       << static_cast<int>(c.b) << 'm';
+        << static_cast<int>(c.r) << ';'
+        << static_cast<int>(c.g) << ';'
+        << static_cast<int>(c.b) << 'm';
 }
 
-inline void emit_reset(std::ostream& os) {
-    os << "\x1b[0m";
-}
+inline void emit_reset(std::ostream& os) { os << "\x1b[0m"; }
 
-// U+2584 LOWER HALF BLOCK  (UTF-8: E2 96 84)
-inline void emit_lower_half(std::ostream& os) {
-    os << "\xe2\x96\x84";
-}
+// U+2584 LOWER HALF BLOCK (UTF-8: E2 96 84)
+inline void emit_lower_half(std::ostream& os) { os << "\xe2\x96\x84"; }
 
-// U+2580 UPPER HALF BLOCK  (UTF-8: E2 96 80)
-inline void emit_upper_half(std::ostream& os) {
-    os << "\xe2\x96\x80";
-}
+// U+2580 UPPER HALF BLOCK (UTF-8: E2 96 80)
+inline void emit_upper_half(std::ostream& os) { os << "\xe2\x96\x80"; }
 
-/// Core rendering implementation.
 template <typename T>
 void render(const T* data, int rows, int cols, const Options& opts) {
     if (rows <= 0 || cols <= 0) return;
 
-    const unsigned char* cmap = find_colormap(opts.colormap);
-    std::ostream& os = *opts.out;
-    const int cw = opts.cell_width > 0 ? opts.cell_width : 1;
+    const unsigned char* cmap = find_colormap(opts.colormap_);
+    std::ostream& os = *opts.out_;
+    const int bs = opts.block_size_ > 0 ? opts.block_size_ : 1;
+    const bool col_major = (opts.layout_ == COL_MAJOR);
 
-    // --- Element accessor (handles layout) ----------------------------------
-    // ROW_MAJOR: data[row * cols + col]
-    // COL_MAJOR: data[col * rows + row]
-    const bool col_major = (opts.layout == COL_MAJOR);
+    // Resolve crop window
+    int r0 = opts.crop_r0_ < 0 ? 0 : opts.crop_r0_;
+    int c0 = opts.crop_c0_ < 0 ? 0 : opts.crop_c0_;
+    if (r0 >= rows || c0 >= cols) return;
+    int vr = (opts.crop_h_ < 0) ? (rows - r0) : opts.crop_h_;
+    int vc = (opts.crop_w_ < 0) ? (cols - c0) : opts.crop_w_;
+    if (r0 + vr > rows) vr = rows - r0;
+    if (c0 + vc > cols) vc = cols - c0;
+    if (vr <= 0 || vc <= 0) return;
 
-    // --- Compute clim -------------------------------------------------------
-    double lo = opts.clim_lo;
-    double hi = opts.clim_hi;
+    // Element accessor (matrix coords relative to crop origin)
+    auto get = [&](int mr, int mc) -> double {
+        if (col_major)
+            return static_cast<double>(data[(c0 + mc) * rows + (r0 + mr)]);
+        else
+            return static_cast<double>(data[(r0 + mr) * cols + (c0 + mc)]);
+    };
 
-    const bool auto_lo = std::isnan(lo);
-    const bool auto_hi = std::isnan(hi);
+    // Compute clim from visible region only
+    double lo = opts.clim_lo_;
+    double hi = opts.clim_hi_;
+    bool auto_lo = std::isnan(lo);
+    bool auto_hi = std::isnan(hi);
 
     if (auto_lo || auto_hi) {
-        double found_lo =  std::numeric_limits<double>::infinity();
-        double found_hi = -std::numeric_limits<double>::infinity();
-        const int n = rows * cols;
-        for (int i = 0; i < n; ++i) {
-            double v = static_cast<double>(data[i]);
-            if (std::isnan(v) || std::isinf(v)) continue;
-            if (v < found_lo) found_lo = v;
-            if (v > found_hi) found_hi = v;
+        double flo = std::numeric_limits<double>::infinity();
+        double fhi = -std::numeric_limits<double>::infinity();
+        for (int mr = 0; mr < vr; ++mr) {
+            for (int mc = 0; mc < vc; ++mc) {
+                double v = get(mr, mc);
+                if (std::isnan(v) || std::isinf(v)) continue;
+                if (v < flo) flo = v;
+                if (v > fhi) fhi = v;
+            }
         }
-        if (auto_lo) lo = found_lo;
-        if (auto_hi) hi = found_hi;
+        if (auto_lo) lo = flo;
+        if (auto_hi) hi = fhi;
     }
 
-    // Guard: if lo/hi are still infinite (all NaN data) or equal, pick sane defaults
     if (std::isinf(lo) || std::isinf(hi)) { lo = 0.0; hi = 1.0; }
-    const double range = (hi != lo) ? (hi - lo) : 1.0;
+    double range = (hi != lo) ? (hi - lo) : 1.0;
 
-    // --- Render rows in pairs -----------------------------------------------
-    for (int r = 0; r < rows; r += 2) {
-        const bool has_bot = (r + 1 < rows);
+    auto normalize = [&](double v) -> double {
+        if (std::isinf(v)) return (v > 0) ? 1.0 : 0.0;
+        double n = (v - lo) / range;
+        if (n < 0.0) n = 0.0;
+        if (n > 1.0) n = 1.0;
+        return n;
+    };
 
-        for (int c = 0; c < cols; ++c) {
-            // Fetch top value
-            const double top_raw = col_major
-                ? static_cast<double>(data[c * rows + r])
-                : static_cast<double>(data[r * cols + c]);
-            const bool top_nan = std::isnan(top_raw);
+    // Render in pixel space: each matrix element maps to a bs x bs block
+    int prows = vr * bs;
+    int pcols = vc * bs;
 
-            // Fetch bottom value (NaN if no bottom row)
-            double bot_raw = NAN;
+    for (int pr = 0; pr < prows; pr += 2) {
+        bool has_bot = (pr + 1 < prows);
+
+        for (int pc = 0; pc < pcols; ++pc) {
+            int mr_top = pr / bs;
+            int mc = pc / bs;
+            double top_val = get(mr_top, mc);
+            bool top_nan = std::isnan(top_val);
+
+            double bot_val = NAN;
+            bool bot_nan = true;
             if (has_bot) {
-                bot_raw = col_major
-                    ? static_cast<double>(data[c * rows + (r + 1)])
-                    : static_cast<double>(data[(r + 1) * cols + c]);
+                int mr_bot = (pr + 1) / bs;
+                bot_val = get(mr_bot, mc);
+                bot_nan = std::isnan(bot_val);
             }
-            const bool bot_nan = std::isnan(bot_raw);
-
-            // Normalize (±Inf → clim extremes)
-            auto normalize = [&](double v) -> double {
-                if (std::isinf(v)) return (v > 0) ? 1.0 : 0.0;
-                double n = (v - lo) / range;
-                if (n < 0.0) n = 0.0;
-                if (n > 1.0) n = 1.0;
-                return n;
-            };
 
             if (top_nan && bot_nan) {
-                // Both transparent: emit plain spaces
                 emit_reset(os);
-                for (int w = 0; w < cw; ++w) os << ' ';
+                os << ' ';
             } else if (top_nan) {
-                // Top transparent, bottom colored → ▄ with default bg
                 emit_reset(os);
-                emit_fg(os, lookup(normalize(bot_raw), cmap));
-                for (int w = 0; w < cw; ++w) emit_lower_half(os);
+                emit_fg(os, lookup(normalize(bot_val), cmap));
+                emit_lower_half(os);
             } else if (bot_nan) {
-                // Top colored, bottom transparent → ▀ with default bg
                 emit_reset(os);
-                emit_fg(os, lookup(normalize(top_raw), cmap));
-                for (int w = 0; w < cw; ++w) emit_upper_half(os);
+                emit_fg(os, lookup(normalize(top_val), cmap));
+                emit_upper_half(os);
             } else {
-                // Both colored → bg=top, fg=bottom, ▄
-                emit_bg(os, lookup(normalize(top_raw), cmap));
-                emit_fg(os, lookup(normalize(bot_raw), cmap));
-                for (int w = 0; w < cw; ++w) emit_lower_half(os);
+                emit_bg(os, lookup(normalize(top_val), cmap));
+                emit_fg(os, lookup(normalize(bot_val), cmap));
+                emit_lower_half(os);
             }
         }
 
