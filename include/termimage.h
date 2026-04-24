@@ -10,6 +10,8 @@
 #ifndef TERMIMAGE_H
 #define TERMIMAGE_H
 
+#include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstddef>
 #include <iostream>
@@ -22,6 +24,17 @@ namespace termimage {
 
 enum class Layout { RowMajor, ColMajor };
 enum class Colormap { Gray, Magma, Viridis };
+
+namespace detail {
+
+inline std::string str_tolower(const std::string& s) {
+    std::string out = s;
+    std::transform(out.begin(), out.end(), out.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    return out;
+}
+
+} // namespace detail
 
 struct Options {
     Options()
@@ -47,8 +60,9 @@ struct Options {
     Options& clim_hi(double v) { clim_hi_ = v; return *this; }
     Options& colormap(Colormap c) { colormap_ = c; return *this; }
     Options& colormap(const std::string& name) {
-        if (name == "viridis") colormap_ = Colormap::Viridis;
-        else if (name == "magma") colormap_ = Colormap::Magma;
+        std::string lower = detail::str_tolower(name);
+        if (lower == "viridis") colormap_ = Colormap::Viridis;
+        else if (lower == "magma") colormap_ = Colormap::Magma;
         else colormap_ = Colormap::Gray;
         return *this;
     }
@@ -92,8 +106,9 @@ namespace detail {
 struct RGB { unsigned char r, g, b; };
 
 inline const unsigned char* find_colormap(const std::string& name) {
+    std::string lower = str_tolower(name);
     for (int i = 0; i < CMAP_COUNT; ++i) {
-        if (name == CMAP_NAMES[i]) return CMAP_DATA[i];
+        if (lower == CMAP_NAMES[i]) return CMAP_DATA[i];
     }
     return CMAP_GRAY;
 }
