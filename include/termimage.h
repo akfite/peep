@@ -31,7 +31,17 @@ namespace termimage {
 typedef std::array<std::uint8_t, 768> ColormapLut;
 
 enum class Layout { RowMajor, ColMajor };
-enum class Colormap { Gray, Magma, Viridis };
+enum class Colormap {
+    Gray,
+    Magma,
+    Viridis,
+    Plasma,
+    Inferno,
+    Cividis,
+    Coolwarm,
+    Gnuplot,
+    Turbo
+};
 
 // What to do when the rendered image would exceed the terminal window.
 //   Off      — render at full size (may wrap or scroll).
@@ -53,6 +63,19 @@ inline std::string str_tolower(const std::string& s) {
     std::transform(out.begin(), out.end(), out.begin(),
                    [](unsigned char c) { return std::tolower(c); });
     return out;
+}
+
+inline Colormap colormap_from_string(const std::string& name) {
+    std::string lower = str_tolower(name);
+    if (lower == "magma") return Colormap::Magma;
+    if (lower == "viridis") return Colormap::Viridis;
+    if (lower == "plasma") return Colormap::Plasma;
+    if (lower == "inferno") return Colormap::Inferno;
+    if (lower == "cividis") return Colormap::Cividis;
+    if (lower == "coolwarm") return Colormap::Coolwarm;
+    if (lower == "gnuplot") return Colormap::Gnuplot;
+    if (lower == "turbo") return Colormap::Turbo;
+    return Colormap::Gray;
 }
 
 } // namespace detail
@@ -93,10 +116,7 @@ struct Options {
     Options& colormap(Colormap c) { colormap_ = c; has_custom_cmap_ = false; return *this; }
     Options& colormap(const std::string& name) {
         has_custom_cmap_ = false;
-        std::string lower = detail::str_tolower(name);
-        if (lower == "viridis") colormap_ = Colormap::Viridis;
-        else if (lower == "magma") colormap_ = Colormap::Magma;
-        else colormap_ = Colormap::Gray;
+        colormap_ = detail::colormap_from_string(name);
         return *this;
     }
     // Custom colormap: 256 RGB triplets (768 bytes), copied for safe ownership.
@@ -203,6 +223,12 @@ inline const ColormapLut& find_colormap(Colormap cmap) {
     switch (cmap) {
         case Colormap::Magma:   return CMAP_MAGMA;
         case Colormap::Viridis: return CMAP_VIRIDIS;
+        case Colormap::Plasma:  return CMAP_PLASMA;
+        case Colormap::Inferno: return CMAP_INFERNO;
+        case Colormap::Cividis: return CMAP_CIVIDIS;
+        case Colormap::Coolwarm: return CMAP_COOLWARM;
+        case Colormap::Gnuplot: return CMAP_GNUPLOT;
+        case Colormap::Turbo:   return CMAP_TURBO;
         default:                return cmap_gray();
     }
 }

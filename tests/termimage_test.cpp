@@ -81,21 +81,33 @@ TEST(Options, CropTwoArgSetsOpenEnd) {
 // ---------------------------------------------------------------------------
 
 TEST(FindColormap, KnownColormapsByString) {
-    EXPECT_EQ(find_colormap("gray"), cmap_gray());
-    EXPECT_EQ(find_colormap("grey"), cmap_gray());
-    EXPECT_EQ(find_colormap("magma"), CMAP_MAGMA);
-    EXPECT_EQ(find_colormap("viridis"), CMAP_VIRIDIS);
+    EXPECT_EQ(&find_colormap("gray"), &cmap_gray());
+    EXPECT_EQ(&find_colormap("grey"), &cmap_gray());
+    EXPECT_EQ(&find_colormap("magma"), &CMAP_MAGMA);
+    EXPECT_EQ(&find_colormap("viridis"), &CMAP_VIRIDIS);
+    EXPECT_EQ(&find_colormap("plasma"), &CMAP_PLASMA);
+    EXPECT_EQ(&find_colormap("inferno"), &CMAP_INFERNO);
+    EXPECT_EQ(&find_colormap("cividis"), &CMAP_CIVIDIS);
+    EXPECT_EQ(&find_colormap("coolwarm"), &CMAP_COOLWARM);
+    EXPECT_EQ(&find_colormap("gnuplot"), &CMAP_GNUPLOT);
+    EXPECT_EQ(&find_colormap("turbo"), &CMAP_TURBO);
 }
 
 TEST(FindColormap, KnownColormapsByEnum) {
-    EXPECT_EQ(find_colormap(Colormap::Gray), cmap_gray());
-    EXPECT_EQ(find_colormap(Colormap::Magma), CMAP_MAGMA);
-    EXPECT_EQ(find_colormap(Colormap::Viridis), CMAP_VIRIDIS);
+    EXPECT_EQ(&find_colormap(Colormap::Gray), &cmap_gray());
+    EXPECT_EQ(&find_colormap(Colormap::Magma), &CMAP_MAGMA);
+    EXPECT_EQ(&find_colormap(Colormap::Viridis), &CMAP_VIRIDIS);
+    EXPECT_EQ(&find_colormap(Colormap::Plasma), &CMAP_PLASMA);
+    EXPECT_EQ(&find_colormap(Colormap::Inferno), &CMAP_INFERNO);
+    EXPECT_EQ(&find_colormap(Colormap::Cividis), &CMAP_CIVIDIS);
+    EXPECT_EQ(&find_colormap(Colormap::Coolwarm), &CMAP_COOLWARM);
+    EXPECT_EQ(&find_colormap(Colormap::Gnuplot), &CMAP_GNUPLOT);
+    EXPECT_EQ(&find_colormap(Colormap::Turbo), &CMAP_TURBO);
 }
 
 TEST(FindColormap, UnknownStringFallsBackToGray) {
-    EXPECT_EQ(find_colormap("nonexistent"), cmap_gray());
-    EXPECT_EQ(find_colormap(""), cmap_gray());
+    EXPECT_EQ(&find_colormap("nonexistent"), &cmap_gray());
+    EXPECT_EQ(&find_colormap(""), &cmap_gray());
 }
 
 // ---------------------------------------------------------------------------
@@ -144,11 +156,11 @@ TEST(Lookup, MagmaEndpoints) {
     EXPECT_EQ(lo.g, 0x00);
     EXPECT_EQ(lo.b, 0x04);
 
-    // Magma index 255: (0xfd, 0xfe, 0xc0)
+    // Magma index 255 from matplotlib's magma colormap.
     RGB hi = lookup(1.0, CMAP_MAGMA);
-    EXPECT_EQ(hi.r, 0xfd);
-    EXPECT_EQ(hi.g, 0xfe);
-    EXPECT_EQ(hi.b, 0xc0);
+    EXPECT_EQ(hi.r, 0xfc);
+    EXPECT_EQ(hi.g, 0xfd);
+    EXPECT_EQ(hi.b, 0xbf);
 }
 
 // ---------------------------------------------------------------------------
@@ -487,6 +499,18 @@ TEST(Render, EnumColormapMatchesStringColormap) {
         render_to_string(data, 2, 2, Options().colormap(Colormap::Magma)));
     EXPECT_EQ(render_to_string(data, 2, 2, Options().colormap("viridis")),
         render_to_string(data, 2, 2, Options().colormap(Colormap::Viridis)));
+    EXPECT_EQ(render_to_string(data, 2, 2, Options().colormap("plasma")),
+        render_to_string(data, 2, 2, Options().colormap(Colormap::Plasma)));
+    EXPECT_EQ(render_to_string(data, 2, 2, Options().colormap("inferno")),
+        render_to_string(data, 2, 2, Options().colormap(Colormap::Inferno)));
+    EXPECT_EQ(render_to_string(data, 2, 2, Options().colormap("cividis")),
+        render_to_string(data, 2, 2, Options().colormap(Colormap::Cividis)));
+    EXPECT_EQ(render_to_string(data, 2, 2, Options().colormap("coolwarm")),
+        render_to_string(data, 2, 2, Options().colormap(Colormap::Coolwarm)));
+    EXPECT_EQ(render_to_string(data, 2, 2, Options().colormap("gnuplot")),
+        render_to_string(data, 2, 2, Options().colormap(Colormap::Gnuplot)));
+    EXPECT_EQ(render_to_string(data, 2, 2, Options().colormap("turbo")),
+        render_to_string(data, 2, 2, Options().colormap(Colormap::Turbo)));
 }
 
 TEST(Render, UnknownColormapUsesGray) {

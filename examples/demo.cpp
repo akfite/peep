@@ -1,20 +1,42 @@
 #include "termimage.h"
 
+#include <cstddef>
 #include <cmath>
 #include <iostream>
 #include <limits>
 #include <vector>
 
 int main() {
-    // 1. Horizontal gradient
-    std::cout << "=== Horizontal gradient (gray) ===" << std::endl;
+    // 1. Colormap gradients
+    std::cout << "=== Colormap gradients ===" << std::endl;
     {
-        const int cols = 32;
+        struct ColormapDemo {
+            const char* name;
+            termimage::Colormap colormap;
+        };
+
+        const ColormapDemo colormaps[] = {
+            {"gray", termimage::Colormap::Gray},
+            {"viridis", termimage::Colormap::Viridis},
+            {"plasma", termimage::Colormap::Plasma},
+            {"inferno", termimage::Colormap::Inferno},
+            {"magma", termimage::Colormap::Magma},
+            {"cividis", termimage::Colormap::Cividis},
+            {"coolwarm", termimage::Colormap::Coolwarm},
+            {"gnuplot", termimage::Colormap::Gnuplot},
+            {"turbo", termimage::Colormap::Turbo},
+        };
+
+        const int cols = 64;
         std::vector<double> grad(cols);
         for (int c = 0; c < cols; ++c)
             grad[c] = static_cast<double>(c) / (cols - 1);
-        termimage::print(grad, 1, cols,
-            termimage::Options().block_size(2));
+
+        for (size_t i = 0; i < sizeof(colormaps) / sizeof(colormaps[0]); ++i) {
+            std::cout << colormaps[i].name << std::endl;
+            termimage::print(grad, 1, cols,
+                termimage::Options().colormap(colormaps[i].colormap));
+        }
     }
     std::cout << std::endl;
 

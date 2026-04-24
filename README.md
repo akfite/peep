@@ -12,7 +12,7 @@ termimage::print(data_vector, n_rows, n_cols);
 - `termimage::print(data, rows, cols)` for raw pointers or `std::vector` data that can be cast to `double`
 - **Header-only**: `#include "termimage.h"`
 - **Minimal requirements**: C++11 compiler and a modern terminal (with full color support)
-- **Color mapping** with support for `gray`, `magma`, `viridis` (from [matplotlib](https://github.com/matplotlib/matplotlib))
+- **Color mapping** with support for `gray`, `viridis`, `plasma`, `inferno`, `magma`, `cividis`, `coolwarm`, `gnuplot`, and `turbo`
 - **Automatic or manual scaling**: computes `clim` from data, or you can set it yourself
 - **Terminal auto-fit**: oversized images are resampled (or trimmed) to fit the window
 - **Crop**: render a subregion without copying data
@@ -86,8 +86,8 @@ All setters are chainable and return `Options&`.
 | Setter | Getter | Description |
 |---|---|---|
 | `.clim(lo, hi)` | `.clim_lo()` / `.clim_hi()` | Color limits. Default: auto from data. |
-| `.colormap(Colormap)` | `.colormap()` | Set by enum (`Colormap::Gray`, `Magma`, `Viridis`). |
-| `.colormap("name")` | | Set by string (`"gray"`, `"magma"`, `"viridis"`). |
+| `.colormap(Colormap)` | `.colormap()` | Set by enum (`Colormap::Gray`, `Magma`, `Viridis`, `Plasma`, `Inferno`, `Cividis`, `Coolwarm`, `Gnuplot`, `Turbo`). |
+| `.colormap("name")` | | Set by string (`"gray"`, `"viridis"`, `"plasma"`, `"inferno"`, `"magma"`, `"cividis"`, `"coolwarm"`, `"gnuplot"`, `"turbo"`). |
 | `.colormap(ColormapLut)` | `.custom_colormap()` | Set a custom 256-entry RGB LUT copied from `std::array<std::uint8_t, 768>`. |
 | `.colormap(vector<uint8_t>)` | `.custom_colormap()` | Set a custom LUT from a vector with exactly 768 bytes. |
 | `.block_size(n)` | `.block_size()` | Pixel scale factor per matrix element. Default: `1`. |
@@ -101,7 +101,9 @@ All setters are chainable and return `Options&`.
 
 ```cpp
 enum class Layout   { RowMajor, ColMajor };
-enum class Colormap { Gray, Magma, Viridis };
+enum class Colormap {
+    Gray, Magma, Viridis, Plasma, Inferno, Cividis, Coolwarm, Gnuplot, Turbo
+};
 enum class Fit      { Off, Resample, Trim };
 ```
 
@@ -121,6 +123,8 @@ mode.
 
 - C++11 compiler
 - A terminal with 24-bit truecolor support
+- `matplotlib` only when regenerating `include/termimage_colormaps.h` with
+  `scripts/generate_colormaps.py`
 
 ## License
 
