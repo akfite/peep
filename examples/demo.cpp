@@ -9,7 +9,6 @@
 
 int main() {
     // 1. Colormap gradients
-    std::cout << "=== Colormap gradients ===" << std::endl;
     {
         struct ColormapDemo {
             const char* name;
@@ -34,16 +33,15 @@ int main() {
             grad[c] = static_cast<double>(c) / (cols - 1);
 
         for (size_t i = 0; i < sizeof(colormaps) / sizeof(colormaps[0]); ++i) {
-            std::cout << colormaps[i].name << std::endl;
             termimage::print(grad, 1, cols,
                 termimage::Options().colormap(colormaps[i].colormap)
+                                    .title(colormaps[i].name)
                                     .colorbar(false));
         }
     }
     std::cout << std::endl;
 
     // 2. RGB uint8 image. 2x4 color chart makes channel/order mistakes obvious.
-    std::cout << "=== RGB uint8 color chart (interleaved, auto block size) ===" << std::endl;
     {
         const int rows = 16;
         const int cols = 32;
@@ -74,18 +72,15 @@ int main() {
                 rgb[i + 2] = colors[tile_r][tile_c][2];
             }
         }
-        std::cout << "top: red | green | blue | white" << std::endl;
-        std::cout << "bot: cyan | magenta | yellow | black" << std::endl;
         termimage::print(rgb, rows, cols,
             termimage::Options()
                 .rgb()
                 .resampling(termimage::Resampling::Nearest)
-                .title("rgb chart"));
+                .title("rgb chart: top R G B W / bottom C M Y K"));
     }
     std::cout << std::endl;
 
     // 3. Square 2D Gaussian scaled by pi (magma, auto block size)
-    std::cout << "=== 2D Gaussian x pi (magma, auto block size) ===" << std::endl;
     {
         const int n = 25;
         const double pi = 3.14159265358979323846;
@@ -99,12 +94,11 @@ int main() {
                           + (r - center) * (r - center))
                     / (sigma * sigma));
         termimage::print(gauss, n, n,
-            termimage::Options().colormap("magma"));
+            termimage::Options().colormap("magma").title("gaussian x pi"));
     }
     std::cout << std::endl;
 
     // 4. Checkerboard with NaN holes (viridis)
-    std::cout << "=== Checkerboard + NaN (viridis) ===" << std::endl;
     {
         const int rows = 10, cols = 20;
         double nan = std::numeric_limits<double>::quiet_NaN();
@@ -117,23 +111,21 @@ int main() {
                     board[r * cols + c] = static_cast<double>((r + c) % 5) / 4.0;
             }
         termimage::print(board, rows, cols,
-            termimage::Options().colormap("viridis"));
+            termimage::Options().colormap("viridis").title("checkerboard + NaN"));
     }
     std::cout << std::endl;
 
     // 5. 8x8 integer ramp, cropped to a 4x6 window starting at (2,1)
-    std::cout << "=== 8x8 integers, cropped to (2,1) 4x6 (gray, auto block size) ===" << std::endl;
     {
         int mat[64];
         for (int i = 0; i < 64; ++i)
             mat[i] = i;
         termimage::print(mat, 8, 8,
-            termimage::Options().crop(2, 1, 4, 6));
+            termimage::Options().crop(2, 1, 4, 6).title("cropped integers"));
     }
     std::cout << std::endl;
 
     // 6. Inf handling with explicit clim
-    std::cout << "=== Inf handling (magma, auto block size) ===" << std::endl;
     {
         double inf = std::numeric_limits<double>::infinity();
         double data[] = {
@@ -141,14 +133,15 @@ int main() {
             0.75, 1.0, inf, 0.5
         };
         termimage::print(data, 2, 4,
-            termimage::Options().colormap("magma").clim(0.0, 1.0));
+            termimage::Options().colormap("magma")
+                                .clim(0.0, 1.0)
+                                .title("inf handling"));
     }
     std::cout << std::endl;
 
     // 7. MATLAB peaks — oversized to demonstrate terminal auto-fit (resample).
     //    The source grid is much larger than any terminal; Fit::Resample
     //    (the default) downsamples it with bilinear interpolation.
-    std::cout << "=== MATLAB peaks (viridis, 1000x1000 resampled to fit) ===" << std::endl;
     {
         const int n = 1000;
         std::vector<double> peaks(n * n);
