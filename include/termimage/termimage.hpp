@@ -853,7 +853,7 @@ inline void append_title_summary(std::ostringstream& ss, const Options& opts,
     }
 
     if (out_r != vr || out_c != vc) {
-        ss << " display=" << out_r << 'x' << out_c;
+        ss << " rendered as " << out_r << 'x' << out_c;
         ss << (resample ? " resampled" : " trimmed");
     }
 }

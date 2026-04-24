@@ -1373,16 +1373,16 @@ TEST(Title, SummaryIncludesCrop) {
         "termimage: data=10x20 crop=(1,2 3x4) cmap=viridis");
 }
 
-TEST(Title, SummaryIncludesDisplayedSizeWhenResampledOrTrimmed) {
+TEST(Title, SummaryIncludesRenderedSizeWhenResampledOrTrimmed) {
     Options resampled;
     resampled.title().colormap("magma");
     EXPECT_EQ(tid::render_title(resampled, 100, 200, 0, 0, 100, 200, 20, 40, true),
-        "termimage: data=100x200 display=20x40 resampled cmap=magma");
+        "termimage: data=100x200 rendered as 20x40 resampled cmap=magma");
 
     Options trimmed;
     trimmed.title().fit(Fit::Trim);
     EXPECT_EQ(tid::render_title(trimmed, 100, 200, 0, 0, 100, 200, 20, 40, false),
-        "termimage: data=100x200 display=20x40 trimmed cmap=gray");
+        "termimage: data=100x200 rendered as 20x40 trimmed cmap=gray");
 }
 
 TEST(Title, RgbSummaryIncludesRgbLayout) {

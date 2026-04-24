@@ -199,7 +199,7 @@ All setters are chainable and return `Options&`.
 | `.center_crop(center_x, center_y, w, h)` | `.crop_center_x()` / `.crop_center_y()` | Crop a `w × h` chip centered on `(center_x, center_y)`. Areas outside the matrix render as NaN for scalar images or black for RGB images. |
 | `.fit(Fit)` | `.fit()` | Behavior when the image exceeds the terminal. Default: `Fit::Resample`. |
 | `.resampling(Resampling)` | `.resampling()` | Strategy used by `Fit::Resample`: `Resampling::Bilinear` (default) or `Resampling::Nearest`. |
-| `.title()` / `.title("label")` | `.show_title()` / `.title_text()` | Prepend a concise info line with data size, crop, display size when resized, colormap, and non-default layout/block size. Default: off. |
+| `.title()` / `.title("label")` | `.show_title()` / `.title_text()` | Prepend a concise info line with data size, crop, rendered size when resized, colormap, and non-default layout/block size. Default: off. |
 | `.colorbar()` / `.colorbar(false)` | `.show_colorbar()` | Append a scalar color scale below the image with the displayed clim low/high labels. Ignored for RGB input. Default: on for scalar images. |
 
 ### Enums
