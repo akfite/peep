@@ -560,20 +560,30 @@ TEST(Render, CropUsesXywhOrder) {
     EXPECT_EQ(cropped, direct);
 }
 
-TEST(Render, CropOutOfBoundsProducesNothing) {
+TEST(Render, CropOutOfBoundsPadsWithNaN) {
     double data[] = {1.0, 2.0, 3.0, 4.0};
-    // crop start beyond matrix dimensions
+    double nan = std::numeric_limits<double>::quiet_NaN();
+    double expected[] = {nan};
+
     std::string out = render_to_string(data, 2, 2, Options().crop(10, 10, 1, 1));
-    EXPECT_EQ(out, "");
+    std::string direct = render_to_string(expected, 1, 1);
+
+    EXPECT_EQ(out, direct);
 }
 
-TEST(Render, CropClampedToMatrixEdge) {
-    // crop window extends past matrix; should be clamped
+TEST(Render, CropPadsPastMatrixEdge) {
+    double nan = std::numeric_limits<double>::quiet_NaN();
     double data[4] = {0.0, 1.0, 0.5, 0.75};
-    std::string out = render_to_string(data, 2, 2, Options().crop(0, 0, 100, 100));
-    std::string full = render_to_string(data, 2, 2);
-    // Clamped crop should match the full matrix output
-    EXPECT_EQ(out, full);
+    double expected[] = {
+        0.0, 1.0, nan, nan,
+        0.5, 0.75, nan, nan,
+        nan, nan, nan, nan
+    };
+
+    std::string out = render_to_string(data, 2, 2, Options().crop(0, 0, 4, 3));
+    std::string direct = render_to_string(expected, 3, 4);
+
+    EXPECT_EQ(out, direct);
 }
 
 TEST(Render, CropTwoArgShowsFromOriginToEnd) {
@@ -599,24 +609,37 @@ TEST(Render, CenterCropMatchesEquivalentExplicitCrop) {
     EXPECT_EQ(centered, explicit_crop);
 }
 
-TEST(Render, CenterCropClipsAtMatrixEdge) {
+TEST(Render, CenterCropPadsAtMatrixEdge) {
+    double nan = std::numeric_limits<double>::quiet_NaN();
     double data[25];
     for (int i = 0; i < 25; i++) data[i] = static_cast<double>(i);
+    double expected[] = {
+        nan, nan, nan,
+        nan, 0.0, 1.0,
+        nan, 5.0, 6.0
+    };
 
     std::string centered = render_to_string(data, 5, 5,
         Options().center_crop(0, 0, 3, 3));
-    std::string explicit_crop = render_to_string(data, 5, 5,
-        Options().crop(0, 0, 2, 2));
+    std::string direct = render_to_string(expected, 3, 3);
 
-    EXPECT_EQ(centered, explicit_crop);
+    EXPECT_EQ(centered, direct);
 }
 
-TEST(Render, CenterCropOutOfBoundsProducesNothing) {
+TEST(Render, CenterCropOutOfBoundsPadsWithNaN) {
+    double nan = std::numeric_limits<double>::quiet_NaN();
     double data[] = {1.0, 2.0, 3.0, 4.0};
+    double expected[] = {
+        nan, nan, nan,
+        nan, nan, nan,
+        nan, nan, nan
+    };
+
     std::string out = render_to_string(data, 2, 2,
         Options().center_crop(10, 10, 3, 3));
+    std::string direct = render_to_string(expected, 3, 3);
 
-    EXPECT_EQ(out, "");
+    EXPECT_EQ(out, direct);
 }
 
 TEST(Render, CenterCropWorksForRgbInput) {
@@ -629,6 +652,20 @@ TEST(Render, CenterCropWorksForRgbInput) {
         Options().crop(1, 1, 2, 2));
 
     EXPECT_EQ(centered, explicit_crop);
+}
+
+TEST(Render, CropPadsRgbInputWithBlack) {
+    const std::uint8_t data[] = {255, 0, 0};
+    const std::uint8_t expected[] = {
+        255, 0, 0,
+        0, 0, 0
+    };
+
+    std::string cropped = capture_rgb_output(data, 1, 1, RGBLayout::Interleaved,
+        Options().crop(0, 0, 2, 1));
+    std::string direct = capture_rgb_output(expected, 1, 2);
+
+    EXPECT_EQ(cropped, direct);
 }
 
 // ---------------------------------------------------------------------------

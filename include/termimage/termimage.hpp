@@ -69,7 +69,9 @@ private:
     };
 
     enum class CropMode {
-        Corner,
+        None,
+        CornerToEnd,
+        CornerWindow,
         Center
     };
 
@@ -99,6 +101,8 @@ public:
     size_t crop_w() const { return crop_w_; }
     size_t crop_h() const { return crop_h_; }
     bool crop_is_centered() const { return crop_mode_ == CropMode::Center; }
+    bool crop_is_to_end() const { return crop_mode_ == CropMode::CornerToEnd; }
+    bool crop_is_window() const { return crop_mode_ == CropMode::CornerWindow; }
     size_t crop_center_x() const { return crop_center_x_; }
     size_t crop_center_y() const { return crop_center_y_; }
     Fit fit() const { return fit_; }
@@ -198,19 +202,19 @@ public:
 
     // Crop: from (x, y) to end of matrix.
     Options& crop(size_t x, size_t y) {
-        crop_mode_ = CropMode::Corner;
+        crop_mode_ = CropMode::CornerToEnd;
         crop_x_ = x; crop_y_ = y;
         crop_h_ = 0; crop_w_ = 0;
         return *this;
     }
     // Crop: w x h window starting at (x, y).
     Options& crop(size_t x, size_t y, size_t w, size_t h) {
-        crop_mode_ = CropMode::Corner;
+        crop_mode_ = CropMode::CornerWindow;
         crop_x_ = x; crop_y_ = y;
         crop_w_ = w; crop_h_ = h;
         return *this;
     }
-    // Crop: w x h window centered on (center_x, center_y), clipped to the matrix.
+    // Crop: w x h window centered on (center_x, center_y), padded outside the matrix.
     Options& center_crop(size_t center_x, size_t center_y, size_t w, size_t h) {
         crop_mode_ = CropMode::Center;
         crop_center_x_ = center_x;
@@ -416,8 +420,8 @@ inline const ColormapLut& resolve_colormap(const Options& opts) {
 
 // Crop and fit planning shared by scalar and RGB renderers.
 struct VisibleRegion {
-    size_t r0;
-    size_t c0;
+    std::ptrdiff_t r0;
+    std::ptrdiff_t c0;
     size_t rows;
     size_t cols;
     bool empty;
@@ -432,23 +436,40 @@ struct FitResolution {
     bool resample;
 };
 
-inline void resolve_center_crop_axis(size_t length, size_t center, size_t extent,
-                                     size_t& start, size_t& visible) {
-    start = 0;
-    visible = 0;
-    if (length == 0 || extent == 0 || center >= length) return;
+inline std::ptrdiff_t region_coord(size_t v) {
+    const size_t max_coord =
+        static_cast<size_t>((std::numeric_limits<std::ptrdiff_t>::max)());
+    if (v > max_coord) return (std::numeric_limits<std::ptrdiff_t>::max)();
+    return static_cast<std::ptrdiff_t>(v);
+}
 
-    const size_t before = extent / 2;
-    const size_t after = extent - before;
+inline std::ptrdiff_t centered_region_start(size_t center, size_t extent) {
+    return region_coord(center) - region_coord(extent / 2);
+}
 
-    start = (center > before) ? (center - before) : 0;
-    size_t end = length;
-    if (after <= std::numeric_limits<size_t>::max() - center) {
-        end = center + after;
-        if (end > length) end = length;
+inline size_t region_extent_to_end(size_t start, size_t length) {
+    return (start < length) ? (length - start) : 0;
+}
+
+inline size_t signed_magnitude(std::ptrdiff_t v) {
+    return static_cast<size_t>(-(v + 1)) + 1;
+}
+
+inline bool resolve_source_index(std::ptrdiff_t start, size_t offset,
+                                 size_t limit, size_t& index) {
+    if (limit == 0) return false;
+
+    if (start < 0) {
+        const size_t pad = signed_magnitude(start);
+        if (offset < pad) return false;
+        index = offset - pad;
+    } else {
+        const size_t base = static_cast<size_t>(start);
+        if (offset > (std::numeric_limits<size_t>::max)() - base) return false;
+        index = base + offset;
     }
 
-    if (end > start) visible = end - start;
+    return index < limit;
 }
 
 inline VisibleRegion resolve_visible_region(size_t rows, size_t cols,
@@ -460,25 +481,33 @@ inline VisibleRegion resolve_visible_region(size_t rows, size_t cols,
     r.cols = 0;
     r.empty = true;
 
-    if (rows == 0 || cols == 0) return r;
-
     if (opts.crop_is_centered()) {
-        resolve_center_crop_axis(rows, opts.crop_center_y(), opts.crop_h(),
-                                 r.r0, r.rows);
-        resolve_center_crop_axis(cols, opts.crop_center_x(), opts.crop_w(),
-                                 r.c0, r.cols);
+        r.r0 = centered_region_start(opts.crop_center_y(), opts.crop_h());
+        r.c0 = centered_region_start(opts.crop_center_x(), opts.crop_w());
+        r.rows = opts.crop_h();
+        r.cols = opts.crop_w();
         r.empty = (r.rows == 0 || r.cols == 0);
         return r;
     }
 
-    r.r0 = opts.crop_y();
-    r.c0 = opts.crop_x();
-    if (r.r0 >= rows || r.c0 >= cols) return r;
+    if (opts.crop_is_to_end()) {
+        r.r0 = region_coord(opts.crop_y());
+        r.c0 = region_coord(opts.crop_x());
+        r.rows = region_extent_to_end(opts.crop_y(), rows);
+        r.cols = region_extent_to_end(opts.crop_x(), cols);
+        r.empty = (r.rows == 0 || r.cols == 0);
+        return r;
+    }
 
-    r.rows = (opts.crop_h() == 0) ? (rows - r.r0) : opts.crop_h();
-    r.cols = (opts.crop_w() == 0) ? (cols - r.c0) : opts.crop_w();
-    if (r.r0 + r.rows > rows) r.rows = rows - r.r0;
-    if (r.c0 + r.cols > cols) r.cols = cols - r.c0;
+    if (opts.crop_is_window()) {
+        r.r0 = region_coord(opts.crop_y());
+        r.c0 = region_coord(opts.crop_x());
+        r.rows = opts.crop_h();
+        r.cols = opts.crop_w();
+    } else {
+        r.rows = rows;
+        r.cols = cols;
+    }
     r.empty = (r.rows == 0 || r.cols == 0);
     return r;
 }
@@ -818,7 +847,8 @@ inline std::string sanitize_title_text(const std::string& s) {
 
 inline void append_title_summary(std::ostringstream& ss, const Options& opts,
                                  size_t rows, size_t cols,
-                                 size_t r0, size_t c0, size_t vr, size_t vc,
+                                 std::ptrdiff_t r0, std::ptrdiff_t c0,
+                                 size_t vr, size_t vc,
                                  size_t out_r, size_t out_c,
                                  bool resample) {
     const std::string& label = opts.title_text();
@@ -837,7 +867,8 @@ inline void append_title_summary(std::ostringstream& ss, const Options& opts,
 }
 
 inline std::string render_title(const Options& opts, size_t rows, size_t cols,
-                                size_t r0, size_t c0, size_t vr, size_t vc,
+                                std::ptrdiff_t r0, std::ptrdiff_t c0,
+                                size_t vr, size_t vc,
                                 size_t out_r, size_t out_c,
                                 bool resample, size_t block_size = 0) {
     std::ostringstream ss;
@@ -857,7 +888,8 @@ inline const char* rgb_layout_name(RGBLayout layout) {
 
 inline std::string render_rgb_title(const Options& opts, const char* rgb_source,
                                     size_t rows, size_t cols,
-                                    size_t r0, size_t c0, size_t vr, size_t vc,
+                                    std::ptrdiff_t r0, std::ptrdiff_t c0,
+                                    size_t vr, size_t vc,
                                     size_t out_r, size_t out_c,
                                     bool resample, size_t block_size = 0) {
     std::ostringstream ss;
@@ -1010,16 +1042,14 @@ inline RGB sample_rgb_resampled(size_t mr, size_t mc, size_t out_r, size_t out_c
 template <typename GetSource>
 void render_scalar_source(size_t rows, size_t cols, GetSource get_source_abs,
                           const Options& opts) {
-    if (rows == 0 || cols == 0) return;
-
     const ColormapLut& cmap = resolve_colormap(opts);
     std::ostream& os = opts.ostream();
 
     RenderPlan plan = make_render_plan(rows, cols, opts, os);
     if (plan.empty) return;
     const size_t bs = plan.block_size;
-    const size_t r0 = plan.visible.r0;
-    const size_t c0 = plan.visible.c0;
+    const std::ptrdiff_t r0 = plan.visible.r0;
+    const std::ptrdiff_t c0 = plan.visible.c0;
     const size_t vr = plan.visible.rows;
     const size_t vc = plan.visible.cols;
     const size_t out_r = plan.out_r;
@@ -1027,7 +1057,13 @@ void render_scalar_source(size_t rows, size_t cols, GetSource get_source_abs,
     const bool resample = plan.resample;
 
     auto get_source = [&](size_t sr, size_t sc) -> double {
-        return static_cast<double>(get_source_abs(r0 + sr, c0 + sc));
+        size_t source_r = 0;
+        size_t source_c = 0;
+        if (!resolve_source_index(r0, sr, rows, source_r)
+            || !resolve_source_index(c0, sc, cols, source_c)) {
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+        return static_cast<double>(get_source_abs(source_r, source_c));
     };
     auto get = [&](size_t mr, size_t mc) -> double {
         if (!resample) return get_source(mr, mc);
@@ -1093,15 +1129,13 @@ void render(const T* data, size_t rows, size_t cols, const Options& opts) {
 template <typename GetSource>
 void render_rgb_source(size_t rows, size_t cols, GetSource get_source_abs,
                        const char* rgb_source, const Options& opts) {
-    if (rows == 0 || cols == 0) return;
-
     std::ostream& os = opts.ostream();
 
     RenderPlan plan = make_render_plan(rows, cols, opts, os);
     if (plan.empty) return;
     const size_t bs = plan.block_size;
-    const size_t r0 = plan.visible.r0;
-    const size_t c0 = plan.visible.c0;
+    const std::ptrdiff_t r0 = plan.visible.r0;
+    const std::ptrdiff_t c0 = plan.visible.c0;
     const size_t vr = plan.visible.rows;
     const size_t vc = plan.visible.cols;
     const size_t out_r = plan.out_r;
@@ -1109,7 +1143,13 @@ void render_rgb_source(size_t rows, size_t cols, GetSource get_source_abs,
     const bool resample = plan.resample;
 
     auto get_source = [&](size_t sr, size_t sc) -> RGB {
-        return get_source_abs(r0 + sr, c0 + sc);
+        size_t source_r = 0;
+        size_t source_c = 0;
+        if (!resolve_source_index(r0, sr, rows, source_r)
+            || !resolve_source_index(c0, sc, cols, source_c)) {
+            return RGB{0, 0, 0};
+        }
+        return get_source_abs(source_r, source_c);
     };
 
     auto get = [&](size_t mr, size_t mc) -> RGB {
@@ -1276,7 +1316,7 @@ inline Options::Options()
       crop_y_(0),
       crop_h_(0),
       crop_w_(0),
-      crop_mode_(CropMode::Corner),
+      crop_mode_(CropMode::None),
       crop_center_x_(0),
       crop_center_y_(0),
       fit_(Fit::Resample),
