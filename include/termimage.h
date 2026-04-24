@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <iostream>
 #include <limits>
+#include <sstream>
 #include <string>
 
 #include "termimage_colormaps.h"
@@ -103,7 +104,11 @@ void print(const T* data, size_t rows, size_t cols, const Options& opts = Option
 // internal API
 namespace detail {
 
-struct RGB { unsigned char r, g, b; };
+struct RGB {
+    unsigned char r, g, b;
+    bool operator==(const RGB& o) const { return r == o.r && g == o.g && b == o.b; }
+    bool operator!=(const RGB& o) const { return !(*this == o); }
+};
 
 inline const unsigned char* find_colormap(const std::string& name) {
     std::string lower = str_tolower(name);
@@ -217,6 +222,37 @@ void render(const T* data, size_t rows, size_t cols, const Options& opts) {
     size_t prows = vr * bs;
     size_t pcols = vc * bs;
 
+    // Buffer all output, then flush once
+    std::ostringstream buf;
+
+    // Track current terminal color state to skip redundant escapes
+    RGB cur_bg = {0, 0, 0}, cur_fg = {0, 0, 0};
+    bool bg_set = false, fg_set = false;
+
+    auto do_reset = [&]() {
+        if (bg_set || fg_set) {
+            emit_reset(buf);
+            bg_set = false;
+            fg_set = false;
+        }
+    };
+
+    auto set_bg = [&](RGB c) {
+        if (!bg_set || cur_bg != c) {
+            emit_bg(buf, c);
+            cur_bg = c;
+            bg_set = true;
+        }
+    };
+
+    auto set_fg = [&](RGB c) {
+        if (!fg_set || cur_fg != c) {
+            emit_fg(buf, c);
+            cur_fg = c;
+            fg_set = true;
+        }
+    };
+
     for (size_t pr = 0; pr < prows; pr += 2) {
         bool has_bot = (pr + 1 < prows);
 
@@ -235,26 +271,31 @@ void render(const T* data, size_t rows, size_t cols, const Options& opts) {
             }
 
             if (top_nan && bot_nan) {
-                emit_reset(os);
-                os << ' ';
+                do_reset();
+                buf << ' ';
             } else if (top_nan) {
-                emit_reset(os);
-                emit_fg(os, lookup(normalize(bot_val), cmap));
-                emit_lower_half(os);
+                do_reset();
+                set_fg(lookup(normalize(bot_val), cmap));
+                emit_lower_half(buf);
             } else if (bot_nan) {
-                emit_reset(os);
-                emit_fg(os, lookup(normalize(top_val), cmap));
-                emit_upper_half(os);
+                do_reset();
+                set_fg(lookup(normalize(top_val), cmap));
+                emit_upper_half(buf);
             } else {
-                emit_bg(os, lookup(normalize(top_val), cmap));
-                emit_fg(os, lookup(normalize(bot_val), cmap));
-                emit_lower_half(os);
+                set_bg(lookup(normalize(top_val), cmap));
+                set_fg(lookup(normalize(bot_val), cmap));
+                emit_lower_half(buf);
             }
         }
 
-        emit_reset(os);
-        os << '\n';
+        do_reset();
+        buf << '\n';
+        // Reset tracking at line boundaries (reset was just emitted)
+        bg_set = false;
+        fg_set = false;
     }
+
+    os << buf.str();
 }
 
 } // namespace detail
