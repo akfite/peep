@@ -16,11 +16,13 @@
 #include <cmath>
 #include <cstdint>
 #include <cstddef>
+#include <functional>
 #include <iostream>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "termimage_colormaps.h"
@@ -35,6 +37,9 @@ struct Color {
     bool operator==(const Color& o) const { return r == o.r && g == o.g && b == o.b; }
     bool operator!=(const Color& o) const { return !(*this == o); }
 };
+
+typedef std::function<double(size_t, size_t)> ScalarAccessor;
+typedef std::function<Color(size_t, size_t)> RGBAccessor;
 
 enum class Layout { RowMajor, ColMajor };
 enum class RGBLayout { Interleaved, Planar };
@@ -140,6 +145,8 @@ struct Options {
         block_size_(1), layout_(Layout::RowMajor), out_(&std::cout),
         crop_r0_(0), crop_c0_(0), crop_h_(0), crop_w_(0),
         fit_(Fit::Resample), resampling_(Resampling::Bilinear),
+        rgb_(false), rgb_layout_(RGBLayout::Interleaved),
+        scalar_accessor_(), rgb_accessor_(),
         title_() {}
 
     // Getters
@@ -165,6 +172,12 @@ struct Options {
     size_t crop_w() const { return crop_w_; }
     Fit fit() const { return fit_; }
     Resampling resampling() const { return resampling_; }
+    bool is_rgb() const { return rgb_; }
+    RGBLayout rgb_layout() const { return rgb_layout_; }
+    bool has_accessor() const { return static_cast<bool>(scalar_accessor_); }
+    bool has_rgb_accessor() const { return static_cast<bool>(rgb_accessor_); }
+    const ScalarAccessor& accessor() const { return scalar_accessor_; }
+    const RGBAccessor& rgb_accessor() const { return rgb_accessor_; }
     bool show_title() const { return title_.show; }
     const std::string& title_text() const { return title_.text; }
 
@@ -249,6 +262,33 @@ struct Options {
     }
     Options& fit(Fit f) { fit_ = f; return *this; }
     Options& resampling(Resampling r) { resampling_ = r; return *this; }
+    Options& scalar() {
+        rgb_ = false;
+        scalar_accessor_ = ScalarAccessor();
+        rgb_accessor_ = RGBAccessor();
+        return *this;
+    }
+    Options& rgb(RGBLayout layout = RGBLayout::Interleaved) {
+        rgb_ = true;
+        rgb_layout_ = layout;
+        scalar_accessor_ = ScalarAccessor();
+        rgb_accessor_ = RGBAccessor();
+        return *this;
+    }
+    template <typename Accessor>
+    Options& accessor(Accessor a) {
+        rgb_ = false;
+        scalar_accessor_ = ScalarAccessor(a);
+        rgb_accessor_ = RGBAccessor();
+        return *this;
+    }
+    template <typename Accessor>
+    Options& rgb_accessor(Accessor a) {
+        rgb_ = true;
+        rgb_accessor_ = RGBAccessor(a);
+        scalar_accessor_ = ScalarAccessor();
+        return *this;
+    }
     Options& title(bool enabled = true) { title_.enable(enabled); return *this; }
     Options& title(const std::string& text) {
         title_.assign(text);
@@ -276,6 +316,10 @@ private:
     size_t crop_w_;
     Fit fit_;
     Resampling resampling_;
+    bool rgb_;
+    RGBLayout rgb_layout_;
+    ScalarAccessor scalar_accessor_;
+    RGBAccessor rgb_accessor_;
     detail::TitleOptions title_;
 };
 
@@ -285,28 +329,14 @@ void print(const T* data, size_t rows, size_t cols, const Options& opts = Option
 template <typename T>
 void print(const std::vector<T>& data, size_t rows, size_t cols,
            const Options& opts = Options());
+void print(size_t rows, size_t cols, const Options& opts);
 template <typename T>
 std::string to_string(const T* data, size_t rows, size_t cols,
                       const Options& opts = Options());
 template <typename T>
 std::string to_string(const std::vector<T>& data, size_t rows, size_t cols,
                       const Options& opts = Options());
-void print_rgb(const std::uint8_t* data, size_t rows, size_t cols,
-               const Options& opts = Options());
-void print_rgb(const std::uint8_t* data, size_t rows, size_t cols,
-               RGBLayout rgb_layout, const Options& opts = Options());
-void print_rgb(const std::vector<std::uint8_t>& data, size_t rows, size_t cols,
-               const Options& opts = Options());
-void print_rgb(const std::vector<std::uint8_t>& data, size_t rows, size_t cols,
-               RGBLayout rgb_layout, const Options& opts = Options());
-std::string rgb_to_string(const std::uint8_t* data, size_t rows, size_t cols,
-                          const Options& opts = Options());
-std::string rgb_to_string(const std::uint8_t* data, size_t rows, size_t cols,
-                          RGBLayout rgb_layout, const Options& opts = Options());
-std::string rgb_to_string(const std::vector<std::uint8_t>& data, size_t rows, size_t cols,
-                          const Options& opts = Options());
-std::string rgb_to_string(const std::vector<std::uint8_t>& data, size_t rows, size_t cols,
-                          RGBLayout rgb_layout, const Options& opts = Options());
+std::string to_string(size_t rows, size_t cols, const Options& opts);
 
 // internal API
 namespace detail {
@@ -622,7 +652,7 @@ inline const char* rgb_layout_name(RGBLayout layout) {
     return (layout == RGBLayout::Planar) ? "planar" : "interleaved";
 }
 
-inline std::string render_rgb_title(const Options& opts, RGBLayout rgb_layout,
+inline std::string render_rgb_title(const Options& opts, const char* rgb_source,
                                     size_t rows, size_t cols,
                                     size_t r0, size_t c0, size_t vr, size_t vc,
                                     size_t out_r, size_t out_c,
@@ -642,7 +672,7 @@ inline std::string render_rgb_title(const Options& opts, RGBLayout rgb_layout,
         ss << (resample ? " resampled" : " trimmed");
     }
 
-    ss << " rgb=" << rgb_layout_name(rgb_layout);
+    ss << " rgb=" << rgb_source;
     if (opts.layout() == Layout::ColMajor) ss << " layout=col-major";
     if (opts.block_size() != 1) ss << " block=" << opts.block_size();
     return ss.str();
@@ -784,16 +814,15 @@ inline RGB sample_rgb_resampled(size_t mr, size_t mc, size_t out_r, size_t out_c
     return sample_rgb_bilinear(mr, mc, out_r, out_c, src_r, src_c, get);
 }
 
-template <typename T>
-void render(const T* data, size_t rows, size_t cols, const Options& opts) {
-    if (!data || rows == 0 || cols == 0) return;
+template <typename GetSource>
+void render_scalar_source(size_t rows, size_t cols, GetSource get_source_abs,
+                          const Options& opts) {
+    if (rows == 0 || cols == 0) return;
 
     const ColormapLut& cmap = resolve_colormap(opts);
     std::ostream& os = opts.ostream();
     const size_t bs = opts.block_size();
-    const bool col_major = (opts.layout() == Layout::ColMajor);
 
-    // Resolve crop window
     size_t r0 = opts.crop_r0();
     size_t c0 = opts.crop_c0();
     if (r0 >= rows || c0 >= cols) return;
@@ -812,14 +841,8 @@ void render(const T* data, size_t rows, size_t cols, const Options& opts) {
     const size_t out_c = fr.out_c;
     const bool resample = fr.resample;
 
-    // Element accessor (output-matrix coords, maps to source via resample or identity).
-    // Bresenham-style index scaling: when out == v, (mr*vr)/out_r == mr (identity), so
-    // resample=true with no shrink is a no-op. trim uses identity sampling directly.
     auto get_source = [&](size_t sr, size_t sc) -> double {
-        if (col_major)
-            return static_cast<double>(data[(c0 + sc) * rows + (r0 + sr)]);
-        else
-            return static_cast<double>(data[(r0 + sr) * cols + (c0 + sc)]);
+        return static_cast<double>(get_source_abs(r0 + sr, c0 + sc));
     };
     auto get = [&](size_t mr, size_t mc) -> double {
         if (!resample) return get_source(mr, mc);
@@ -864,13 +887,27 @@ void render(const T* data, size_t rows, size_t cols, const Options& opts) {
     os << buf.str();
 }
 
-inline void render_rgb(const std::uint8_t* data, size_t rows, size_t cols,
-                       RGBLayout rgb_layout, const Options& opts) {
-    if (!data || rows == 0 || cols == 0) return;
+template <typename T>
+void render(const T* data, size_t rows, size_t cols, const Options& opts) {
+    if (!data) return;
+    const bool col_major = (opts.layout() == Layout::ColMajor);
+
+    auto get_source = [&](size_t r, size_t c) -> double {
+        if (col_major)
+            return static_cast<double>(data[c * rows + r]);
+        return static_cast<double>(data[r * cols + c]);
+    };
+
+    render_scalar_source(rows, cols, get_source, opts);
+}
+
+template <typename GetSource>
+void render_rgb_source(size_t rows, size_t cols, GetSource get_source_abs,
+                       const char* rgb_source, const Options& opts) {
+    if (rows == 0 || cols == 0) return;
 
     std::ostream& os = opts.ostream();
     const size_t bs = opts.block_size();
-    const bool col_major = (opts.layout() == Layout::ColMajor);
 
     size_t r0 = opts.crop_r0();
     size_t c0 = opts.crop_c0();
@@ -886,20 +923,9 @@ inline void render_rgb(const std::uint8_t* data, size_t rows, size_t cols,
     const size_t out_r = fr.out_r;
     const size_t out_c = fr.out_c;
     const bool resample = fr.resample;
-    const size_t plane = rows * cols;
-
-    auto spatial_index = [&](size_t sr, size_t sc) -> size_t {
-        return col_major ? ((c0 + sc) * rows + (r0 + sr))
-                         : ((r0 + sr) * cols + (c0 + sc));
-    };
 
     auto get_source = [&](size_t sr, size_t sc) -> RGB {
-        const size_t i = spatial_index(sr, sc);
-        if (rgb_layout == RGBLayout::Planar) {
-            return RGB{data[i], data[plane + i], data[2 * plane + i]};
-        }
-        const size_t j = i * 3;
-        return RGB{data[j], data[j + 1], data[j + 2]};
+        return get_source_abs(r0 + sr, c0 + sc);
     };
 
     auto get = [&](size_t mr, size_t mc) -> RGB {
@@ -910,7 +936,7 @@ inline void render_rgb(const std::uint8_t* data, size_t rows, size_t cols,
 
     std::ostringstream buf;
     if (opts.show_title()) {
-        buf << render_rgb_title(opts, rgb_layout, rows, cols,
+        buf << render_rgb_title(opts, rgb_source, rows, cols,
                                 r0, c0, vr, vc, out_r, out_c, resample)
             << '\n';
     }
@@ -921,6 +947,28 @@ inline void render_rgb(const std::uint8_t* data, size_t rows, size_t cols,
     emit_pixel_body(buf, out_r, out_c, bs, pixel_at);
 
     os << buf.str();
+}
+
+inline void render_rgb(const std::uint8_t* data, size_t rows, size_t cols,
+                       RGBLayout rgb_layout, const Options& opts) {
+    if (!data) return;
+    const bool col_major = (opts.layout() == Layout::ColMajor);
+    const size_t plane = rows * cols;
+
+    auto spatial_index = [&](size_t r, size_t c) -> size_t {
+        return col_major ? (c * rows + r) : (r * cols + c);
+    };
+
+    auto get_source = [&](size_t r, size_t c) -> RGB {
+        const size_t i = spatial_index(r, c);
+        if (rgb_layout == RGBLayout::Planar) {
+            return RGB{data[i], data[plane + i], data[2 * plane + i]};
+        }
+        const size_t j = i * 3;
+        return RGB{data[j], data[j + 1], data[j + 2]};
+    };
+
+    render_rgb_source(rows, cols, get_source, rgb_layout_name(rgb_layout), opts);
 }
 
 inline void validate_vector_size(size_t size, size_t rows, size_t cols) {
@@ -949,23 +997,74 @@ inline void validate_rgb_vector_size(size_t size, size_t rows, size_t cols) {
     }
 }
 
-template <typename T>
-std::string render_to_string(const T* data, size_t rows, size_t cols, const Options& opts = Options()) {
+inline void render_from_options(size_t rows, size_t cols, const Options& opts) {
+    if (opts.is_rgb()) {
+        if (!opts.has_rgb_accessor()) {
+            throw std::invalid_argument("termimage RGB accessor is required for print(rows, cols, opts)");
+        }
+        render_rgb_source(rows, cols, opts.rgb_accessor(), "accessor", opts);
+        return;
+    }
+    if (!opts.has_accessor()) {
+        throw std::invalid_argument("termimage accessor is required for print(rows, cols, opts)");
+    }
+    render_scalar_source(rows, cols, opts.accessor(), opts);
+}
+
+inline std::string render_options_to_string(size_t rows, size_t cols, const Options& opts) {
     std::ostringstream oss;
     Options local = opts;
     local.ostream(oss);
-    render(data, rows, cols, local);
+    render_from_options(rows, cols, local);
     return oss.str();
 }
 
-inline std::string render_rgb_to_string(const std::uint8_t* data, size_t rows, size_t cols,
-                                        RGBLayout rgb_layout,
-                                        const Options& opts = Options()) {
+template <typename T>
+inline void render_data_as_rgb(const T*, size_t, size_t, const Options&, std::false_type) {
+    throw std::invalid_argument("termimage RGB input data must be std::uint8_t");
+}
+
+inline void render_data_as_rgb(const std::uint8_t* data, size_t rows, size_t cols,
+                               const Options& opts, std::true_type) {
+    render_rgb(data, rows, cols, opts.rgb_layout(), opts);
+}
+
+template <typename T>
+inline void render_data(const T* data, size_t rows, size_t cols, const Options& opts) {
+    if (opts.has_accessor() || opts.has_rgb_accessor()) {
+        throw std::invalid_argument("termimage accessor options require print(rows, cols, opts)");
+    }
+    if (opts.is_rgb()) {
+        render_data_as_rgb(data, rows, cols, opts, typename std::is_same<T, std::uint8_t>::type());
+    } else {
+        render(data, rows, cols, opts);
+    }
+}
+
+template <typename T>
+inline std::string render_data_to_string(const T* data, size_t rows, size_t cols,
+                                         const Options& opts) {
     std::ostringstream oss;
     Options local = opts;
     local.ostream(oss);
-    render_rgb(data, rows, cols, rgb_layout, local);
+    render_data(data, rows, cols, local);
     return oss.str();
+}
+
+template <typename T>
+inline void validate_data_vector_size(size_t size, size_t rows, size_t cols,
+                                      const Options& opts) {
+    if (opts.has_accessor() || opts.has_rgb_accessor()) {
+        throw std::invalid_argument("termimage accessor options require print(rows, cols, opts)");
+    }
+    if (opts.is_rgb()) {
+        if (!std::is_same<T, std::uint8_t>::value) {
+            throw std::invalid_argument("termimage RGB vector input must contain std::uint8_t values");
+        }
+        validate_rgb_vector_size(size, rows, cols);
+    } else {
+        validate_vector_size(size, rows, cols);
+    }
 }
 
 } // namespace detail
@@ -973,70 +1072,32 @@ inline std::string render_rgb_to_string(const std::uint8_t* data, size_t rows, s
 // template definitions
 template <typename T>
 void print(const T* data, size_t rows, size_t cols, const Options& opts) {
-    detail::render(data, rows, cols, opts);
+    detail::render_data(data, rows, cols, opts);
 }
 
 template <typename T>
 void print(const std::vector<T>& data, size_t rows, size_t cols, const Options& opts) {
-    detail::validate_vector_size(data.size(), rows, cols);
-    detail::render(data.data(), rows, cols, opts);
+    detail::validate_data_vector_size<T>(data.size(), rows, cols, opts);
+    detail::render_data(data.data(), rows, cols, opts);
+}
+
+inline void print(size_t rows, size_t cols, const Options& opts) {
+    detail::render_from_options(rows, cols, opts);
 }
 
 template <typename T>
 std::string to_string(const T* data, size_t rows, size_t cols, const Options& opts) {
-    return detail::render_to_string(data, rows, cols, opts);
+    return detail::render_data_to_string(data, rows, cols, opts);
 }
 
 template <typename T>
 std::string to_string(const std::vector<T>& data, size_t rows, size_t cols, const Options& opts) {
-    detail::validate_vector_size(data.size(), rows, cols);
-    return detail::render_to_string(data.data(), rows, cols, opts);
+    detail::validate_data_vector_size<T>(data.size(), rows, cols, opts);
+    return detail::render_data_to_string(data.data(), rows, cols, opts);
 }
 
-inline void print_rgb(const std::uint8_t* data, size_t rows, size_t cols,
-                      const Options& opts) {
-    detail::render_rgb(data, rows, cols, RGBLayout::Interleaved, opts);
-}
-
-inline void print_rgb(const std::uint8_t* data, size_t rows, size_t cols,
-                      RGBLayout rgb_layout, const Options& opts) {
-    detail::render_rgb(data, rows, cols, rgb_layout, opts);
-}
-
-inline void print_rgb(const std::vector<std::uint8_t>& data, size_t rows, size_t cols,
-                      const Options& opts) {
-    detail::validate_rgb_vector_size(data.size(), rows, cols);
-    detail::render_rgb(data.data(), rows, cols, RGBLayout::Interleaved, opts);
-}
-
-inline void print_rgb(const std::vector<std::uint8_t>& data, size_t rows, size_t cols,
-                      RGBLayout rgb_layout, const Options& opts) {
-    detail::validate_rgb_vector_size(data.size(), rows, cols);
-    detail::render_rgb(data.data(), rows, cols, rgb_layout, opts);
-}
-
-inline std::string rgb_to_string(const std::uint8_t* data, size_t rows, size_t cols,
-                                 const Options& opts) {
-    return detail::render_rgb_to_string(data, rows, cols, RGBLayout::Interleaved, opts);
-}
-
-inline std::string rgb_to_string(const std::uint8_t* data, size_t rows, size_t cols,
-                                 RGBLayout rgb_layout, const Options& opts) {
-    return detail::render_rgb_to_string(data, rows, cols, rgb_layout, opts);
-}
-
-inline std::string rgb_to_string(const std::vector<std::uint8_t>& data,
-                                 size_t rows, size_t cols, const Options& opts) {
-    detail::validate_rgb_vector_size(data.size(), rows, cols);
-    return detail::render_rgb_to_string(data.data(), rows, cols,
-                                        RGBLayout::Interleaved, opts);
-}
-
-inline std::string rgb_to_string(const std::vector<std::uint8_t>& data,
-                                 size_t rows, size_t cols,
-                                 RGBLayout rgb_layout, const Options& opts) {
-    detail::validate_rgb_vector_size(data.size(), rows, cols);
-    return detail::render_rgb_to_string(data.data(), rows, cols, rgb_layout, opts);
+inline std::string to_string(size_t rows, size_t cols, const Options& opts) {
+    return detail::render_options_to_string(rows, cols, opts);
 }
 
 } // namespace termimage

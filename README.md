@@ -5,14 +5,17 @@ A tiny header-only C++11 library for debugging and visualizing 2D numeric arrays
 ```cpp
 termimage::print(data_ptr, n_rows, n_cols);
 termimage::print(data_vector, n_rows, n_cols);
-termimage::print_rgb(rgb_vector, n_rows, n_cols);
-std::string rendered = termimage::rgb_to_string(rgb_vector, n_rows, n_cols);
+termimage::print(rgb_vector, n_rows, n_cols, termimage::Options().rgb());
+std::string rendered = termimage::to_string(rgb_vector, n_rows, n_cols,
+                                           termimage::Options().rgb());
 ```
 
 ## Highlights
 
 - `termimage::print(data, rows, cols)` for raw pointers or `std::vector` data that can be cast to `double`
-- `termimage::print_rgb(data, rows, cols)` for `uint8_t` RGB images
+- `termimage::print(data, rows, cols, Options().rgb())` for `uint8_t` RGB images
+- `termimage::print(rows, cols, Options().accessor(...))` for custom scalar image containers
+- `termimage::print(rows, cols, Options().rgb_accessor(...))` for custom RGB image containers
 - **Header-only**: `#include "termimage.h"`
 - **Minimal requirements**: C++11 compiler and a modern terminal (with full color support)
 - **Color mapping** with support for `gray`, `viridis`, `plasma`, `inferno`, `magma`, `cividis`, `coolwarm`, `gnuplot`, and `turbo`
@@ -42,7 +45,7 @@ std::vector<std::uint8_t> rgb = {
     255, 0, 0,   0, 255, 0,
     0, 0, 255,   255, 255, 255
 };
-termimage::print_rgb(rgb, 2, 2);
+termimage::print(rgb, 2, 2, termimage::Options().rgb());
 ```
 
 ## Building
@@ -85,6 +88,8 @@ void print(const T* data, size_t rows, size_t cols,
 template <typename T>
 void print(const std::vector<T>& data, size_t rows, size_t cols,
            const Options& opts = Options());
+
+void print(size_t rows, size_t cols, const Options& opts);
 ```
 
 Renders a `rows × cols` matrix as a colored image on the terminal. Pointer
@@ -92,52 +97,54 @@ inputs are intentionally simple and work with custom containers; their
 dimensions are trusted. The vector overload validates that
 `data.size() == rows * cols`.
 
-### `termimage::print_rgb`
+Use `.rgb()` to treat `std::uint8_t` pointer or vector input as RGB data:
 
 ```cpp
-void print_rgb(const std::uint8_t* data, size_t rows, size_t cols,
-               const Options& opts = Options());
-
-void print_rgb(const std::uint8_t* data, size_t rows, size_t cols,
-               RGBLayout rgb_layout, const Options& opts = Options());
-
-void print_rgb(const std::vector<std::uint8_t>& data, size_t rows, size_t cols,
-               const Options& opts = Options());
-
-void print_rgb(const std::vector<std::uint8_t>& data, size_t rows, size_t cols,
-               RGBLayout rgb_layout, const Options& opts = Options());
+termimage::print(rgb, rows, cols, termimage::Options().rgb());
+termimage::print(rgb, rows, cols,
+                 termimage::Options().rgb(termimage::RGBLayout::Planar));
 ```
 
-Renders a `rows × cols` RGB image from `uint8_t` data. The default
-`RGBLayout::Interleaved` expects `RGBRGB...`; `RGBLayout::Planar` expects all
-red samples first, then green, then blue. Pointer dimensions are trusted. The
-vector overload validates that `data.size() == rows * cols * 3`.
+The default `RGBLayout::Interleaved` expects `RGBRGB...`;
+`RGBLayout::Planar` expects all red samples first, then green, then blue. RGB
+vectors validate that `data.size() == rows * cols * 3`. Scalar-only options
+such as `clim`, `colormap`, and special NaN/Inf colors do not apply to RGB
+input.
 
-`print_rgb` uses the layout, crop, fit, resampling, block size, title, and
-ostream options. Scalar-only options such as `clim`, `colormap`, and special
-NaN/Inf colors do not apply.
-
-### `termimage::rgb_to_string`
+Use accessor options when data lives in a custom container or layout:
 
 ```cpp
-std::string rgb_to_string(const std::uint8_t* data, size_t rows, size_t cols,
-                          const Options& opts = Options());
+termimage::ScalarAccessor scalar = [&](size_t r, size_t c) {
+    return image.value_at(r, c);
+};
+termimage::print(rows, cols, termimage::Options().accessor(scalar));
 
-std::string rgb_to_string(const std::uint8_t* data, size_t rows, size_t cols,
-                          RGBLayout rgb_layout, const Options& opts = Options());
-
-std::string rgb_to_string(const std::vector<std::uint8_t>& data,
-                          size_t rows, size_t cols,
-                          const Options& opts = Options());
-
-std::string rgb_to_string(const std::vector<std::uint8_t>& data,
-                          size_t rows, size_t cols,
-                          RGBLayout rgb_layout,
-                          const Options& opts = Options());
+termimage::RGBAccessor rgb_at = [&](size_t r, size_t c) {
+    auto p = image.pixel_at(r, c);
+    return termimage::Color{p.red, p.green, p.blue};
+};
+termimage::print(rows, cols, termimage::Options().rgb_accessor(rgb_at));
 ```
 
-Returns the same ANSI-rendered RGB output as `print_rgb` without writing to the
-configured stream.
+Accessor options are source options; use them with the overloads that take only
+`rows`, `cols`, and `Options`.
+
+### `termimage::to_string`
+
+```cpp
+template <typename T>
+std::string to_string(const T* data, size_t rows, size_t cols,
+                      const Options& opts = Options());
+
+template <typename T>
+std::string to_string(const std::vector<T>& data, size_t rows, size_t cols,
+                      const Options& opts = Options());
+
+std::string to_string(size_t rows, size_t cols, const Options& opts);
+```
+
+Returns the same ANSI-rendered output as `print` without writing to the
+configured stream. It supports the same scalar, RGB, and accessor modes.
 
 ### `termimage::Options`
 
@@ -154,6 +161,10 @@ All setters are chainable and return `Options&`.
 | `.inf_color(Color)` / `.inf_colors(neg, pos)` | `.neg_inf_color()` / `.pos_inf_color()` | Render infinities with fixed RGB colors instead of colormap endpoints. |
 | `.block_size(n)` | `.block_size()` | Pixel scale factor per matrix element. Default: `1`. |
 | `.layout(Layout)` | `.layout()` | `Layout::RowMajor` (default) or `Layout::ColMajor`. |
+| `.scalar()` | `.is_rgb()` | Select scalar pointer/vector data mode. Default. |
+| `.rgb(RGBLayout)` | `.is_rgb()` / `.rgb_layout()` | Select RGB pointer/vector data mode for `uint8_t` input. Default layout: `RGBLayout::Interleaved`. |
+| `.accessor(lambda)` | `.has_accessor()` | Select scalar accessor source mode. The callable receives `(row, col)` and returns a scalar value. |
+| `.rgb_accessor(lambda)` | `.has_rgb_accessor()` | Select RGB accessor source mode. The callable receives `(row, col)` and returns `termimage::Color`. |
 | `.ostream(os)` | `.ostream()` | Output stream. Default: `std::cout`. |
 | `.crop(r0, c0)` | `.crop_r0()` / `.crop_c0()` | Crop from `(r0, c0)` to end of matrix. |
 | `.crop(r0, c0, h, w)` | `.crop_h()` / `.crop_w()` | Crop a `h × w` subregion starting at `(r0, c0)`. |

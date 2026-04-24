@@ -166,14 +166,16 @@ static BenchResult run_rgb_bench(const std::string& name,
     {
         std::ostringstream sink;
         termimage::Options opts = base_opts;
+        opts.rgb(rgb_layout);
         if (mode == OutputMode::Buffer) opts.ostream(sink);
         else opts.ostream(std::cout);
-        termimage::print_rgb(data, rows, cols, rgb_layout, opts);
+        termimage::print(data, rows, cols, opts);
     }
 
     // Measure
     std::ostringstream sink;
     termimage::Options opts = base_opts;
+    opts.rgb(rgb_layout);
     if (mode == OutputMode::Buffer) opts.ostream(sink);
     else opts.ostream(std::cout);
 
@@ -185,7 +187,7 @@ static BenchResult run_rgb_bench(const std::string& name,
         } else {
             std::cout << "\x1b[H\x1b[J";
         }
-        termimage::print_rgb(data, rows, cols, rgb_layout, opts);
+        termimage::print(data, rows, cols, opts);
         if (mode == OutputMode::Terminal) std::cout.flush();
     }
     auto t1 = Clock::now();

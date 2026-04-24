@@ -35,6 +35,10 @@ TEST(Options, DefaultValues) {
     EXPECT_EQ(opts.crop_w(), 0u);
     EXPECT_EQ(opts.fit(), Fit::Resample);
     EXPECT_EQ(opts.resampling(), Resampling::Bilinear);
+    EXPECT_FALSE(opts.is_rgb());
+    EXPECT_EQ(opts.rgb_layout(), RGBLayout::Interleaved);
+    EXPECT_FALSE(opts.has_accessor());
+    EXPECT_FALSE(opts.has_rgb_accessor());
     EXPECT_FALSE(opts.show_title());
     EXPECT_EQ(opts.title_text(), "");
 }
@@ -69,6 +73,39 @@ TEST(Options, ChainableSetters) {
     EXPECT_EQ(opts.resampling(), Resampling::Nearest);
     EXPECT_TRUE(opts.show_title());
     EXPECT_EQ(opts.title_text(), "demo");
+}
+
+TEST(Options, RgbAndAccessorSetters) {
+    Options opts;
+    opts.rgb(RGBLayout::Planar);
+    EXPECT_TRUE(opts.is_rgb());
+    EXPECT_EQ(opts.rgb_layout(), RGBLayout::Planar);
+
+    opts.accessor([](size_t r, size_t c) {
+        return static_cast<double>(r + c);
+    });
+    EXPECT_FALSE(opts.is_rgb());
+    EXPECT_TRUE(opts.has_accessor());
+    EXPECT_FALSE(opts.has_rgb_accessor());
+
+    opts.rgb();
+    EXPECT_TRUE(opts.is_rgb());
+    EXPECT_FALSE(opts.has_accessor());
+    EXPECT_FALSE(opts.has_rgb_accessor());
+
+    opts.rgb_accessor([](size_t r, size_t c) {
+        return Color{static_cast<std::uint8_t>(r),
+                     static_cast<std::uint8_t>(c),
+                     0};
+    });
+    EXPECT_TRUE(opts.is_rgb());
+    EXPECT_FALSE(opts.has_accessor());
+    EXPECT_TRUE(opts.has_rgb_accessor());
+
+    opts.scalar();
+    EXPECT_FALSE(opts.is_rgb());
+    EXPECT_FALSE(opts.has_accessor());
+    EXPECT_FALSE(opts.has_rgb_accessor());
 }
 
 TEST(Options, ClimIndividualSetters) {
@@ -251,13 +288,13 @@ static std::string render_to_string(const double* data, size_t rows, size_t cols
     return oss.str();
 }
 
-static std::string capture_rgb_to_string(const std::uint8_t* data, size_t rows, size_t cols,
-                                         RGBLayout rgb_layout = RGBLayout::Interleaved,
-                                         const Options& base = Options()) {
+static std::string capture_rgb_output(const std::uint8_t* data, size_t rows, size_t cols,
+                                      RGBLayout rgb_layout = RGBLayout::Interleaved,
+                                      const Options& base = Options()) {
     std::ostringstream oss;
     Options opts = base;
-    opts.ostream(oss);
-    termimage::print_rgb(data, rows, cols, rgb_layout, opts);
+    opts.ostream(oss).rgb(rgb_layout);
+    termimage::print(data, rows, cols, opts);
     return oss.str();
 }
 
@@ -557,7 +594,7 @@ TEST(RenderRgb, InterleavedUsesRgbTripletsDirectly) {
         0, 0, 255
     };
 
-    std::string out = capture_rgb_to_string(data, 2, 1);
+    std::string out = capture_rgb_output(data, 2, 1);
 
     EXPECT_EQ(out,
         "\x1b[48;2;255;0;0m"
@@ -573,7 +610,7 @@ TEST(RenderRgb, PlanarUsesSeparateColorPlanes) {
         0, 255    // B plane
     };
 
-    EXPECT_EQ(capture_rgb_to_string(data, 2, 1, RGBLayout::Planar),
+    EXPECT_EQ(capture_rgb_output(data, 2, 1, RGBLayout::Planar),
         "\x1b[48;2;255;0;0m"
         "\x1b[38;2;0;0;255m"
         "\xe2\x96\x84"
@@ -583,7 +620,7 @@ TEST(RenderRgb, PlanarUsesSeparateColorPlanes) {
 TEST(RenderRgb, OddRowsUseUpperHalfBlock) {
     const std::uint8_t data[] = {9, 8, 7};
 
-    std::string out = capture_rgb_to_string(data, 1, 1);
+    std::string out = capture_rgb_output(data, 1, 1);
 
     EXPECT_EQ(out,
         "\x1b[38;2;9;8;7m"
@@ -599,9 +636,9 @@ TEST(RenderRgb, HonorsColumnMajorSpatialLayout) {
         255, 255, 255
     };
 
-    std::string row_out = capture_rgb_to_string(data, 2, 2, RGBLayout::Interleaved,
+    std::string row_out = capture_rgb_output(data, 2, 2, RGBLayout::Interleaved,
         Options().layout(Layout::RowMajor));
-    std::string col_out = capture_rgb_to_string(data, 2, 2, RGBLayout::Interleaved,
+    std::string col_out = capture_rgb_output(data, 2, 2, RGBLayout::Interleaved,
         Options().layout(Layout::ColMajor));
 
     EXPECT_NE(row_out, col_out);
@@ -613,14 +650,66 @@ TEST(RenderRgb, VectorInputMatchesPointerInput) {
         0, 0, 255
     };
     std::ostringstream oss;
-    termimage::print_rgb(data, 2, 1, Options().ostream(oss));
+    termimage::print(data, 2, 1, Options().ostream(oss).rgb());
 
-    EXPECT_EQ(oss.str(), capture_rgb_to_string(data.data(), 2, 1));
+    EXPECT_EQ(oss.str(), capture_rgb_output(data.data(), 2, 1));
 }
 
 TEST(RenderRgb, VectorInputRejectsMismatchedDimensions) {
     std::vector<std::uint8_t> data(5);
-    EXPECT_THROW(termimage::print_rgb(data, 2, 1), std::invalid_argument);
+    EXPECT_THROW(termimage::print(data, 2, 1, Options().rgb()), std::invalid_argument);
+}
+
+TEST(RenderAccessor, ScalarAccessorMatchesPointerInput) {
+    std::vector<double> data = {0.0, 1.0, 2.0, 3.0};
+
+    Options opts;
+    opts.colormap("gray")
+        .accessor([&](size_t r, size_t c) {
+            return data[r * 2 + c];
+        });
+
+    EXPECT_EQ(to_string(2, 2, opts),
+              to_string(data, 2, 2, Options().colormap("gray")));
+}
+
+TEST(RenderAccessor, RgbAccessorMatchesRgbPointerInput) {
+    const std::uint8_t rgb[] = {
+        255, 0, 0,
+        0, 0, 255
+    };
+
+    Options opts;
+    opts.rgb_accessor([&](size_t r, size_t) {
+        const size_t i = r * 3;
+        return Color{rgb[i + 0], rgb[i + 1], rgb[i + 2]};
+    });
+
+    EXPECT_EQ(to_string(2, 1, opts),
+              to_string(rgb, 2, 1, Options().rgb()));
+}
+
+TEST(RenderAccessor, MissingAccessorThrows) {
+    EXPECT_THROW(print(2, 2, Options()), std::invalid_argument);
+    EXPECT_THROW(print(2, 2, Options().rgb()), std::invalid_argument);
+    EXPECT_THROW(to_string(2, 2, Options()), std::invalid_argument);
+}
+
+TEST(RenderAccessor, DataInputRejectsAccessorOptions) {
+    double scalar_data[] = {1.0};
+    std::vector<double> scalar_vec = {1.0};
+    const std::uint8_t rgb_data[] = {255, 0, 0};
+
+    auto scalar = [](size_t, size_t) {
+        return 1.0;
+    };
+    auto rgb = [](size_t, size_t) {
+        return Color{255, 0, 0};
+    };
+
+    EXPECT_THROW(print(scalar_data, 1, 1, Options().accessor(scalar)), std::invalid_argument);
+    EXPECT_THROW(to_string(scalar_vec, 1, 1, Options().accessor(scalar)), std::invalid_argument);
+    EXPECT_THROW(print(rgb_data, 1, 1, Options().rgb_accessor(rgb)), std::invalid_argument);
 }
 
 // ---------------------------------------------------------------------------
@@ -1129,7 +1218,7 @@ TEST(Title, RgbSummaryIncludesRgbLayout) {
     Options opts;
     opts.title("rgb frame").layout(Layout::ColMajor).block_size(2);
 
-    EXPECT_EQ(render_rgb_title(opts, RGBLayout::Planar,
+    EXPECT_EQ(render_rgb_title(opts, "planar",
             10, 20, 1, 2, 3, 4, 3, 4, false),
         "rgb frame: data=10x20 crop=(1,2 3x4) rgb=planar layout=col-major block=2");
 }
@@ -1166,35 +1255,35 @@ TEST(ToString, DoesNotAffectOriginalOstream) {
     EXPECT_EQ(oss.str(), "");
 }
 
-TEST(RgbToString, MatchesPrintOutput) {
+TEST(ToStringRgb, MatchesPrintOutput) {
     const std::uint8_t data[] = {
         255, 0, 0,
         0, 0, 255
     };
-    std::string via_tostring = rgb_to_string(data, 2, 1);
-    std::string via_print = capture_rgb_to_string(data, 2, 1);
+    std::string via_tostring = to_string(data, 2, 1, Options().rgb());
+    std::string via_print = capture_rgb_output(data, 2, 1);
 
     EXPECT_EQ(via_tostring, via_print);
 }
 
-TEST(RgbToString, SupportsPlanarLayout) {
+TEST(ToStringRgb, SupportsPlanarLayout) {
     const std::uint8_t data[] = {
         255, 0,
         0, 0,
         0, 255
     };
 
-    EXPECT_EQ(rgb_to_string(data, 2, 1, RGBLayout::Planar),
-              capture_rgb_to_string(data, 2, 1, RGBLayout::Planar));
+    EXPECT_EQ(to_string(data, 2, 1, Options().rgb(RGBLayout::Planar)),
+              capture_rgb_output(data, 2, 1, RGBLayout::Planar));
 }
 
-TEST(RgbToString, DoesNotAffectOriginalOstream) {
+TEST(ToStringRgb, DoesNotAffectOriginalOstream) {
     std::ostringstream oss;
     Options opts;
     opts.ostream(oss);
     const std::uint8_t data[] = {255, 0, 0};
 
-    std::string result = rgb_to_string(data, 1, 1, opts);
+    std::string result = to_string(data, 1, 1, opts.rgb());
 
     EXPECT_FALSE(result.empty());
     EXPECT_EQ(oss.str(), "");
@@ -1223,18 +1312,18 @@ TEST(VectorApi, RejectsMismatchedDimensions) {
     EXPECT_THROW(to_string(data, 2, 2), std::invalid_argument);
 }
 
-TEST(VectorApi, RgbToStringMatchesPointerInput) {
+TEST(VectorApi, RgbVectorToStringMatchesPointerInput) {
     std::vector<std::uint8_t> data = {
         255, 0, 0,
         0, 0, 255
     };
 
-    EXPECT_EQ(rgb_to_string(data, 2, 1),
-              rgb_to_string(data.data(), 2, 1));
+    EXPECT_EQ(to_string(data, 2, 1, Options().rgb()),
+              to_string(data.data(), 2, 1, Options().rgb()));
 }
 
-TEST(VectorApi, RgbToStringRejectsMismatchedDimensions) {
+TEST(VectorApi, RgbVectorToStringRejectsMismatchedDimensions) {
     std::vector<std::uint8_t> data(5);
 
-    EXPECT_THROW(rgb_to_string(data, 2, 1), std::invalid_argument);
+    EXPECT_THROW(to_string(data, 2, 1, Options().rgb()), std::invalid_argument);
 }

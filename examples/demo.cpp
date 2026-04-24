@@ -75,8 +75,9 @@ int main() {
         }
         std::cout << "top: red | green | blue | white" << std::endl;
         std::cout << "bot: cyan | magenta | yellow | black" << std::endl;
-        termimage::print_rgb(rgb, rows, cols,
+        termimage::print(rgb, rows, cols,
             termimage::Options()
+                .rgb()
                 .block_size(2)
                 .resampling(termimage::Resampling::Nearest)
                 .title("rgb chart"));
