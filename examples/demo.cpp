@@ -121,7 +121,7 @@ int main() {
             }
         }
         termimage::print(peaks, n, n,
-            termimage::Options().colormap("viridis"));
+            termimage::Options().colormap("viridis").title("peaks"));
     }
 
     return 0;

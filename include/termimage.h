@@ -90,7 +90,7 @@ struct Options {
         custom_cmap_(), has_custom_cmap_(false),
         block_size_(1), layout_(Layout::RowMajor), out_(&std::cout),
         crop_r0_(0), crop_c0_(0), crop_h_(0), crop_w_(0),
-        fit_(Fit::Resample) {}
+        fit_(Fit::Resample), title_(false), title_text_() {}
 
     // Getters
     double clim_lo() const { return clim_lo_; }
@@ -108,6 +108,8 @@ struct Options {
     size_t crop_h() const { return crop_h_; }
     size_t crop_w() const { return crop_w_; }
     Fit fit() const { return fit_; }
+    bool show_title() const { return title_; }
+    const std::string& title_text() const { return title_text_; }
 
     // Chainable setters
     Options& clim(double lo, double hi) { clim_lo_ = lo; clim_hi_ = hi; return *this; }
@@ -155,6 +157,17 @@ struct Options {
         return *this;
     }
     Options& fit(Fit f) { fit_ = f; return *this; }
+    Options& title(bool enabled = true) { title_ = enabled; return *this; }
+    Options& title(const std::string& text) {
+        title_ = true;
+        title_text_ = text;
+        return *this;
+    }
+    Options& title(const char* text) {
+        title_ = true;
+        title_text_ = text ? text : "";
+        return *this;
+    }
 
 private:
     double clim_lo_;
@@ -170,6 +183,8 @@ private:
     size_t crop_h_;
     size_t crop_w_;
     Fit fit_;
+    bool title_;
+    std::string title_text_;
 };
 
 // public API
@@ -230,6 +245,20 @@ inline const ColormapLut& find_colormap(Colormap cmap) {
         case Colormap::Gnuplot: return CMAP_GNUPLOT;
         case Colormap::Turbo:   return CMAP_TURBO;
         default:                return cmap_gray();
+    }
+}
+
+inline const char* colormap_name(Colormap cmap) {
+    switch (cmap) {
+        case Colormap::Magma:    return "magma";
+        case Colormap::Viridis:  return "viridis";
+        case Colormap::Plasma:   return "plasma";
+        case Colormap::Inferno:  return "inferno";
+        case Colormap::Cividis:  return "cividis";
+        case Colormap::Coolwarm: return "coolwarm";
+        case Colormap::Gnuplot:  return "gnuplot";
+        case Colormap::Turbo:    return "turbo";
+        default:                 return "gray";
     }
 }
 
@@ -326,6 +355,31 @@ inline void emit_lower_half(std::ostream& os) { os << "\xe2\x96\x84"; }
 // U+2580 UPPER HALF BLOCK (UTF-8: E2 96 80)
 inline void emit_upper_half(std::ostream& os) { os << "\xe2\x96\x80"; }
 
+inline std::string render_title(const Options& opts, size_t rows, size_t cols,
+                                size_t r0, size_t c0, size_t vr, size_t vc,
+                                size_t out_r, size_t out_c,
+                                bool resample) {
+    std::ostringstream ss;
+    const std::string& label = opts.title_text();
+    ss << (label.empty() ? "termimage" : label) << ": ";
+    ss << "data=" << rows << 'x' << cols;
+
+    const bool cropped = (r0 != 0 || c0 != 0 || vr != rows || vc != cols);
+    if (cropped) {
+        ss << " crop=(" << r0 << ',' << c0 << ' ' << vr << 'x' << vc << ')';
+    }
+
+    if (out_r != vr || out_c != vc) {
+        ss << " display=" << out_r << 'x' << out_c;
+        ss << (resample ? " resampled" : " trimmed");
+    }
+
+    ss << " cmap=" << (opts.has_custom_colormap() ? "custom" : colormap_name(opts.colormap()));
+    if (opts.layout() == Layout::ColMajor) ss << " layout=col-major";
+    if (opts.block_size() != 1) ss << " block=" << opts.block_size();
+    return ss.str();
+}
+
 template <typename T>
 void render(const T* data, size_t rows, size_t cols, const Options& opts) {
     if (!data || rows == 0 || cols == 0) return;
@@ -404,6 +458,10 @@ void render(const T* data, size_t rows, size_t cols, const Options& opts) {
 
     // Buffer all output, then flush once
     std::ostringstream buf;
+    if (opts.show_title()) {
+        buf << render_title(opts, rows, cols, r0, c0, vr, vc, out_r, out_c, resample)
+            << '\n';
+    }
 
     // Track current terminal color state to skip redundant escapes
     RGB cur_bg = {0, 0, 0}, cur_fg = {0, 0, 0};

@@ -96,6 +96,7 @@ All setters are chainable and return `Options&`.
 | `.crop(r0, c0)` | `.crop_r0()` / `.crop_c0()` | Crop from `(r0, c0)` to end of matrix. |
 | `.crop(r0, c0, h, w)` | `.crop_h()` / `.crop_w()` | Crop a `h × w` subregion starting at `(r0, c0)`. |
 | `.fit(Fit)` | `.fit()` | Behavior when the image exceeds the terminal. Default: `Fit::Resample`. |
+| `.title()` / `.title("label")` | `.show_title()` / `.title_text()` | Prepend a concise info line with data size, crop, display size when resized, colormap, and non-default layout/block size. Default: off. |
 
 ### Enums
 

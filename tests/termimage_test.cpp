@@ -31,6 +31,8 @@ TEST(Options, DefaultValues) {
     EXPECT_EQ(opts.crop_h(), 0u);
     EXPECT_EQ(opts.crop_w(), 0u);
     EXPECT_EQ(opts.fit(), Fit::Resample);
+    EXPECT_FALSE(opts.show_title());
+    EXPECT_EQ(opts.title_text(), "");
 }
 
 TEST(Options, ChainableSetters) {
@@ -42,7 +44,8 @@ TEST(Options, ChainableSetters) {
                        .layout(Layout::ColMajor)
                        .ostream(oss)
                        .crop(4, 5, 6, 7)
-                       .fit(Fit::Trim);
+                       .fit(Fit::Trim)
+                       .title("demo");
 
     // Chaining must return the same object
     EXPECT_EQ(&ref, &opts);
@@ -58,6 +61,8 @@ TEST(Options, ChainableSetters) {
     EXPECT_EQ(opts.crop_h(), 6u);
     EXPECT_EQ(opts.crop_w(), 7u);
     EXPECT_EQ(opts.fit(), Fit::Trim);
+    EXPECT_TRUE(opts.show_title());
+    EXPECT_EQ(opts.title_text(), "demo");
 }
 
 TEST(Options, ClimIndividualSetters) {
@@ -834,6 +839,48 @@ TEST(Fit, OstringstreamRendersIdenticallyAcrossModes) {
 
     EXPECT_EQ(off, resample);
     EXPECT_EQ(off, trim);
+}
+
+// ---------------------------------------------------------------------------
+// Optional title
+// ---------------------------------------------------------------------------
+
+TEST(Title, RenderPrependsConciseSummaryWhenEnabled) {
+    double data[] = {0.0, 1.0, 2.0, 3.0};
+    std::string out = to_string(data, 2, 2, Options().title());
+
+    EXPECT_EQ(out.find("termimage: data=2x2 cmap=gray\n"), 0u);
+}
+
+TEST(Title, CustomLabelAndNonDefaultOptionsAppearInSummary) {
+    double data[] = {0.0, 1.0, 2.0, 3.0};
+    std::string out = to_string(data, 2, 2,
+        Options().title("frame 7")
+                 .colormap("turbo")
+                 .layout(Layout::ColMajor)
+                 .block_size(2));
+
+    EXPECT_EQ(out.find("frame 7: data=2x2 cmap=turbo layout=col-major block=2\n"), 0u);
+}
+
+TEST(Title, SummaryIncludesCrop) {
+    Options opts;
+    opts.title().crop(1, 2, 3, 4).colormap("viridis");
+
+    EXPECT_EQ(render_title(opts, 10, 20, 1, 2, 3, 4, 3, 4, false),
+        "termimage: data=10x20 crop=(1,2 3x4) cmap=viridis");
+}
+
+TEST(Title, SummaryIncludesDisplayedSizeWhenResampledOrTrimmed) {
+    Options resampled;
+    resampled.title().colormap("magma");
+    EXPECT_EQ(render_title(resampled, 100, 200, 0, 0, 100, 200, 20, 40, true),
+        "termimage: data=100x200 display=20x40 resampled cmap=magma");
+
+    Options trimmed;
+    trimmed.title().fit(Fit::Trim);
+    EXPECT_EQ(render_title(trimmed, 100, 200, 0, 0, 100, 200, 20, 40, false),
+        "termimage: data=100x200 display=20x40 trimmed cmap=gray");
 }
 
 // ---------------------------------------------------------------------------
