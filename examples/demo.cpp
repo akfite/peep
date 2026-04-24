@@ -13,7 +13,7 @@ int main() {
         std::vector<double> grad(cols);
         for (int c = 0; c < cols; ++c)
             grad[c] = static_cast<double>(c) / (cols - 1);
-        termimage::print(grad.data(), 1, cols,
+        termimage::print(grad, 1, cols,
             termimage::Options().block_size(2));
     }
     std::cout << std::endl;
@@ -31,7 +31,7 @@ int main() {
                     -0.5 * ((c - center) * (c - center)
                           + (r - center) * (r - center))
                     / (sigma * sigma));
-        termimage::print(gauss.data(), n, n,
+        termimage::print(gauss, n, n,
             termimage::Options().colormap("magma").block_size(2));
     }
     std::cout << std::endl;
@@ -49,7 +49,7 @@ int main() {
                 else
                     board[r * cols + c] = static_cast<double>((r + c) % 5) / 4.0;
             }
-        termimage::print(board.data(), rows, cols,
+        termimage::print(board, rows, cols,
             termimage::Options().colormap("viridis"));
     }
     std::cout << std::endl;
@@ -98,7 +98,7 @@ int main() {
                         * std::exp(-(x + 1) * (x + 1) - y * y);
             }
         }
-        termimage::print(peaks.data(), n, n,
+        termimage::print(peaks, n, n,
             termimage::Options().colormap("viridis"));
     }
 

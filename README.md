@@ -4,11 +4,12 @@ A tiny header-only C++11 library for debugging and visualizing 2D numeric arrays
 
 ```cpp
 termimage::print(data_ptr, n_rows, n_cols);
+termimage::print(data_vector, n_rows, n_cols);
 ```
 
 ## Highlights
 
-- `termimage::print(*data, rows, cols)` any data that can be cast to `double`
+- `termimage::print(data, rows, cols)` for raw pointers or `std::vector` data that can be cast to `double`
 - **Header-only**: `#include "termimage.h"`
 - **Minimal requirements**: C++11 compiler and a modern terminal (with full color support)
 - **Color mapping** with support for `gray`, `magma`, `viridis` (from [matplotlib](https://github.com/matplotlib/matplotlib))
@@ -24,9 +25,13 @@ termimage::print(data_ptr, n_rows, n_cols);
 
 ```cpp
 #include "termimage.h"
+#include <vector>
 
 double data[] = {0, 1, 2, 3, 4, 5};
 termimage::print(data, 2, 3); // print with 2 rows, 3 cols
+
+std::vector<double> vec = {0, 1, 2, 3, 4, 5};
+termimage::print(vec, 2, 3);
 ```
 
 ## Building
@@ -63,11 +68,16 @@ ctest --test-dir build
 
 ```cpp
 template <typename T>
-void print(const T* data, int rows, int cols,
+void print(const T* data, size_t rows, size_t cols,
+           const Options& opts = Options());
+
+template <typename T>
+void print(const std::vector<T>& data, size_t rows, size_t cols,
            const Options& opts = Options());
 ```
 
-Renders a `rows × cols` matrix pointed to by `data` as a colored image on the terminal.
+Renders a `rows × cols` matrix as a colored image on the terminal. The vector
+overload validates that `data.size() == rows * cols`.
 
 ### `termimage::Options`
 
@@ -78,6 +88,8 @@ All setters are chainable and return `Options&`.
 | `.clim(lo, hi)` | `.clim_lo()` / `.clim_hi()` | Color limits. Default: auto from data. |
 | `.colormap(Colormap)` | `.colormap()` | Set by enum (`Colormap::Gray`, `Magma`, `Viridis`). |
 | `.colormap("name")` | | Set by string (`"gray"`, `"magma"`, `"viridis"`). |
+| `.colormap(ColormapLut)` | `.custom_colormap()` | Set a custom 256-entry RGB LUT copied from `std::array<std::uint8_t, 768>`. |
+| `.colormap(vector<uint8_t>)` | `.custom_colormap()` | Set a custom LUT from a vector with exactly 768 bytes. |
 | `.block_size(n)` | `.block_size()` | Pixel scale factor per matrix element. Default: `1`. |
 | `.layout(Layout)` | `.layout()` | `Layout::RowMajor` (default) or `Layout::ColMajor`. |
 | `.ostream(os)` | `.ostream()` | Output stream. Default: `std::cout`. |

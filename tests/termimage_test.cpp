@@ -2,9 +2,12 @@
 
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -550,17 +553,17 @@ TEST(Render, LargeMatrixDoesNotCrash) {
 // ---------------------------------------------------------------------------
 
 TEST(CmapGray, AllEntriesCorrect) {
-    const unsigned char* g = cmap_gray();
+    const ColormapLut& g = cmap_gray();
     for (int i = 0; i < 256; ++i) {
-        EXPECT_EQ(g[i * 3 + 0], static_cast<unsigned char>(i));
-        EXPECT_EQ(g[i * 3 + 1], static_cast<unsigned char>(i));
-        EXPECT_EQ(g[i * 3 + 2], static_cast<unsigned char>(i));
+        EXPECT_EQ(g[i * 3 + 0], static_cast<std::uint8_t>(i));
+        EXPECT_EQ(g[i * 3 + 1], static_cast<std::uint8_t>(i));
+        EXPECT_EQ(g[i * 3 + 2], static_cast<std::uint8_t>(i));
     }
 }
 
 TEST(CmapGray, StablePointer) {
-    // Repeated calls should return the same pointer (lazy-init singleton)
-    EXPECT_EQ(cmap_gray(), cmap_gray());
+    // Repeated calls should return the same singleton object.
+    EXPECT_EQ(&cmap_gray(), &cmap_gray());
 }
 
 // ---------------------------------------------------------------------------
@@ -569,7 +572,7 @@ TEST(CmapGray, StablePointer) {
 
 TEST(CustomColormap, OverridesEnumColormap) {
     // Build a trivial all-red LUT
-    static unsigned char red_lut[768];
+    ColormapLut red_lut;
     for (int i = 0; i < 256; ++i) {
         red_lut[i * 3 + 0] = 255;
         red_lut[i * 3 + 1] = 0;
@@ -587,16 +590,18 @@ TEST(CustomColormap, OverridesEnumColormap) {
 }
 
 TEST(CustomColormap, EnumSetterClearsCustom) {
-    static unsigned char lut[768] = {};
+    ColormapLut lut = {};
     Options opts;
     opts.colormap(lut);
     EXPECT_NE(opts.custom_colormap(), nullptr);
+    EXPECT_TRUE(opts.has_custom_colormap());
     opts.colormap(Colormap::Viridis);
     EXPECT_EQ(opts.custom_colormap(), nullptr);
+    EXPECT_FALSE(opts.has_custom_colormap());
 }
 
 TEST(CustomColormap, StringSetterClearsCustom) {
-    static unsigned char lut[768] = {};
+    ColormapLut lut = {};
     Options opts;
     opts.colormap(lut);
     EXPECT_NE(opts.custom_colormap(), nullptr);
@@ -607,6 +612,40 @@ TEST(CustomColormap, StringSetterClearsCustom) {
 TEST(CustomColormap, DefaultIsNull) {
     Options opts;
     EXPECT_EQ(opts.custom_colormap(), nullptr);
+    EXPECT_FALSE(opts.has_custom_colormap());
+}
+
+TEST(CustomColormap, CopiesArrayInput) {
+    ColormapLut lut = {};
+    lut[0] = 1;
+
+    Options opts;
+    opts.colormap(lut);
+    lut[0] = 99;
+
+    ASSERT_NE(opts.custom_colormap(), nullptr);
+    EXPECT_EQ((*opts.custom_colormap())[0], 1);
+}
+
+TEST(CustomColormap, AcceptsVectorInput) {
+    std::vector<std::uint8_t> lut(768, 0);
+    lut[0] = 10;
+    lut[1] = 20;
+    lut[2] = 30;
+
+    Options opts;
+    opts.colormap(lut);
+
+    ASSERT_NE(opts.custom_colormap(), nullptr);
+    EXPECT_EQ((*opts.custom_colormap())[0], 10);
+    EXPECT_EQ((*opts.custom_colormap())[1], 20);
+    EXPECT_EQ((*opts.custom_colormap())[2], 30);
+}
+
+TEST(CustomColormap, RejectsWrongSizedVectorInput) {
+    Options opts;
+    std::vector<std::uint8_t> lut(767, 0);
+    EXPECT_THROW(opts.colormap(lut), std::invalid_argument);
 }
 
 // ---------------------------------------------------------------------------
@@ -803,4 +842,27 @@ TEST(ToString, DoesNotAffectOriginalOstream) {
     EXPECT_FALSE(result.empty());
     // The original ostream should be untouched
     EXPECT_EQ(oss.str(), "");
+}
+
+TEST(VectorApi, PrintMatchesPointerInput) {
+    std::vector<double> data = {0.0, 0.5, 1.0, 0.25};
+    std::ostringstream oss;
+    print(data, 2, 2, Options().ostream(oss).colormap("magma"));
+
+    EXPECT_EQ(oss.str(), render_to_string(data.data(), 2, 2,
+        Options().colormap("magma")));
+}
+
+TEST(VectorApi, ToStringMatchesPointerInput) {
+    std::vector<int> data = {0, 1, 2, 3};
+
+    EXPECT_EQ(to_string(data, 2, 2, Options().colormap("viridis")),
+        to_string(data.data(), 2, 2, Options().colormap("viridis")));
+}
+
+TEST(VectorApi, RejectsMismatchedDimensions) {
+    std::vector<double> data = {0.0, 1.0, 2.0};
+
+    EXPECT_THROW(print(data, 2, 2), std::invalid_argument);
+    EXPECT_THROW(to_string(data, 2, 2), std::invalid_argument);
 }
