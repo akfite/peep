@@ -123,16 +123,47 @@ struct FitResolution {
     bool resample;
 };
 
+inline void resolve_center_crop_axis(size_t length, size_t center, size_t extent,
+                                     size_t& start, size_t& visible) {
+    start = 0;
+    visible = 0;
+    if (length == 0 || extent == 0 || center >= length) return;
+
+    const size_t before = extent / 2;
+    const size_t after = extent - before;
+
+    start = (center > before) ? (center - before) : 0;
+    size_t end = length;
+    if (after <= std::numeric_limits<size_t>::max() - center) {
+        end = center + after;
+        if (end > length) end = length;
+    }
+
+    if (end > start) visible = end - start;
+}
+
 inline VisibleRegion resolve_visible_region(size_t rows, size_t cols,
                                             const Options& opts) {
     VisibleRegion r;
-    r.r0 = opts.crop_r0();
-    r.c0 = opts.crop_c0();
+    r.r0 = 0;
+    r.c0 = 0;
     r.rows = 0;
     r.cols = 0;
     r.empty = true;
 
     if (rows == 0 || cols == 0) return r;
+
+    if (opts.crop_is_centered()) {
+        resolve_center_crop_axis(rows, opts.crop_center_y(), opts.crop_h(),
+                                 r.r0, r.rows);
+        resolve_center_crop_axis(cols, opts.crop_center_x(), opts.crop_w(),
+                                 r.c0, r.cols);
+        r.empty = (r.rows == 0 || r.cols == 0);
+        return r;
+    }
+
+    r.r0 = opts.crop_y();
+    r.c0 = opts.crop_x();
     if (r.r0 >= rows || r.c0 >= cols) return r;
 
     r.rows = (opts.crop_h() == 0) ? (rows - r.r0) : opts.crop_h();
@@ -480,7 +511,7 @@ inline void append_title_summary(std::ostringstream& ss, const Options& opts,
 
     const bool cropped = (r0 != 0 || c0 != 0 || vr != rows || vc != cols);
     if (cropped) {
-        ss << " crop=(" << r0 << ',' << c0 << ' ' << vr << 'x' << vc << ')';
+        ss << " crop=(" << c0 << ',' << r0 << ' ' << vc << 'x' << vr << ')';
     }
 
     if (out_r != vr || out_c != vc) {

@@ -115,13 +115,13 @@ int main() {
     }
     std::cout << std::endl;
 
-    // 5. 8x8 integer ramp, cropped to a 4x6 window starting at (2,1)
+    // 5. 8x8 integer ramp, center-cropped to a 6x4 chip around (4,4)
     {
         int mat[64];
         for (int i = 0; i < 64; ++i)
             mat[i] = i;
         termimage::print(mat, 8, 8,
-            termimage::Options().crop(2, 1, 4, 6).title("cropped integers"));
+            termimage::Options().center_crop(4, 4, 6, 4).title("center-cropped integers"));
     }
     std::cout << std::endl;
 

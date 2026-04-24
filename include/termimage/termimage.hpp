@@ -65,6 +65,11 @@ private:
         RGBAccessor
     };
 
+    enum class CropMode {
+        Corner,
+        Center
+    };
+
 public:
     Options();
 
@@ -86,10 +91,13 @@ public:
     bool has_block_size() const { return block_size_set_; }
     Layout layout() const { return layout_; }
     std::ostream& ostream() const { return *out_; }
-    size_t crop_r0() const { return crop_r0_; }
-    size_t crop_c0() const { return crop_c0_; }
-    size_t crop_h() const { return crop_h_; }
+    size_t crop_x() const { return crop_x_; }
+    size_t crop_y() const { return crop_y_; }
     size_t crop_w() const { return crop_w_; }
+    size_t crop_h() const { return crop_h_; }
+    bool crop_is_centered() const { return crop_mode_ == CropMode::Center; }
+    size_t crop_center_x() const { return crop_center_x_; }
+    size_t crop_center_y() const { return crop_center_y_; }
     Fit fit() const { return fit_; }
     Resampling resampling() const { return resampling_; }
     bool is_rgb() const {
@@ -185,16 +193,29 @@ public:
     Options& layout(Layout l) { layout_ = l; return *this; }
     Options& ostream(std::ostream& os) { out_ = &os; return *this; }
 
-    // Crop: from (r0, c0) to end of matrix
-    Options& crop(size_t r0, size_t c0) {
-        crop_r0_ = r0; crop_c0_ = c0;
+    // Crop: from (x, y) to end of matrix.
+    Options& crop(size_t x, size_t y) {
+        crop_mode_ = CropMode::Corner;
+        crop_x_ = x; crop_y_ = y;
         crop_h_ = 0; crop_w_ = 0;
         return *this;
     }
-    // Crop: from (r0, c0) with explicit size h x w
-    Options& crop(size_t r0, size_t c0, size_t h, size_t w) {
-        crop_r0_ = r0; crop_c0_ = c0;
-        crop_h_ = h; crop_w_ = w;
+    // Crop: w x h window starting at (x, y).
+    Options& crop(size_t x, size_t y, size_t w, size_t h) {
+        crop_mode_ = CropMode::Corner;
+        crop_x_ = x; crop_y_ = y;
+        crop_w_ = w; crop_h_ = h;
+        return *this;
+    }
+    // Crop: w x h window centered on (center_x, center_y), clipped to the matrix.
+    Options& center_crop(size_t center_x, size_t center_y, size_t w, size_t h) {
+        crop_mode_ = CropMode::Center;
+        crop_center_x_ = center_x;
+        crop_center_y_ = center_y;
+        crop_w_ = w;
+        crop_h_ = h;
+        crop_x_ = 0;
+        crop_y_ = 0;
         return *this;
     }
     Options& fit(Fit f) { fit_ = f; return *this; }
@@ -258,10 +279,13 @@ private:
     bool block_size_set_;
     Layout layout_;
     std::ostream* out_;
-    size_t crop_r0_;
-    size_t crop_c0_;
+    size_t crop_x_;
+    size_t crop_y_;
     size_t crop_h_;
     size_t crop_w_;
+    CropMode crop_mode_;
+    size_t crop_center_x_;
+    size_t crop_center_y_;
     Fit fit_;
     Resampling resampling_;
     SourceMode source_mode_;
@@ -312,10 +336,13 @@ inline Options::Options()
       block_size_set_(false),
       layout_(Layout::RowMajor),
       out_(&std::cout),
-      crop_r0_(0),
-      crop_c0_(0),
+      crop_x_(0),
+      crop_y_(0),
       crop_h_(0),
       crop_w_(0),
+      crop_mode_(CropMode::Corner),
+      crop_center_x_(0),
+      crop_center_y_(0),
       fit_(Fit::Resample),
       resampling_(Resampling::Bilinear),
       source_mode_(SourceMode::ScalarData),

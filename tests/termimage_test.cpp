@@ -30,10 +30,13 @@ TEST(Options, DefaultValues) {
     EXPECT_FALSE(opts.has_block_size());
     EXPECT_EQ(opts.layout(), Layout::RowMajor);
     EXPECT_EQ(&opts.ostream(), &std::cout);
-    EXPECT_EQ(opts.crop_r0(), 0);
-    EXPECT_EQ(opts.crop_c0(), 0);
-    EXPECT_EQ(opts.crop_h(), 0u);
+    EXPECT_EQ(opts.crop_x(), 0u);
+    EXPECT_EQ(opts.crop_y(), 0u);
     EXPECT_EQ(opts.crop_w(), 0u);
+    EXPECT_EQ(opts.crop_h(), 0u);
+    EXPECT_FALSE(opts.crop_is_centered());
+    EXPECT_EQ(opts.crop_center_x(), 0u);
+    EXPECT_EQ(opts.crop_center_y(), 0u);
     EXPECT_EQ(opts.fit(), Fit::Resample);
     EXPECT_EQ(opts.resampling(), Resampling::Bilinear);
     EXPECT_FALSE(opts.is_rgb());
@@ -69,10 +72,11 @@ TEST(Options, ChainableSetters) {
     EXPECT_TRUE(opts.has_block_size());
     EXPECT_EQ(opts.layout(), Layout::ColMajor);
     EXPECT_EQ(&opts.ostream(), &oss);
-    EXPECT_EQ(opts.crop_r0(), 4u);
-    EXPECT_EQ(opts.crop_c0(), 5u);
-    EXPECT_EQ(opts.crop_h(), 6u);
-    EXPECT_EQ(opts.crop_w(), 7u);
+    EXPECT_EQ(opts.crop_x(), 4u);
+    EXPECT_EQ(opts.crop_y(), 5u);
+    EXPECT_EQ(opts.crop_w(), 6u);
+    EXPECT_EQ(opts.crop_h(), 7u);
+    EXPECT_FALSE(opts.crop_is_centered());
     EXPECT_EQ(opts.fit(), Fit::Trim);
     EXPECT_EQ(opts.resampling(), Resampling::Nearest);
     EXPECT_TRUE(opts.show_title());
@@ -151,11 +155,25 @@ TEST(Options, SharedInfColorSetterSetsBothSigns) {
 
 TEST(Options, CropTwoArgSetsOpenEnd) {
     Options opts;
+    opts.center_crop(1, 2, 3, 4);
     opts.crop(3, 7);
-    EXPECT_EQ(opts.crop_r0(), 3u);
-    EXPECT_EQ(opts.crop_c0(), 7u);
-    EXPECT_EQ(opts.crop_h(), 0u);
+    EXPECT_EQ(opts.crop_x(), 3u);
+    EXPECT_EQ(opts.crop_y(), 7u);
     EXPECT_EQ(opts.crop_w(), 0u);
+    EXPECT_EQ(opts.crop_h(), 0u);
+    EXPECT_FALSE(opts.crop_is_centered());
+}
+
+TEST(Options, CenterCropSetsCenterAndDimensions) {
+    Options opts;
+    Options& ref = opts.center_crop(4, 5, 6, 7);
+
+    EXPECT_EQ(&ref, &opts);
+    EXPECT_TRUE(opts.crop_is_centered());
+    EXPECT_EQ(opts.crop_center_x(), 4u);
+    EXPECT_EQ(opts.crop_center_y(), 5u);
+    EXPECT_EQ(opts.crop_w(), 6u);
+    EXPECT_EQ(opts.crop_h(), 7u);
 }
 
 // ---------------------------------------------------------------------------
@@ -531,6 +549,17 @@ TEST(Render, CropReducesOutput) {
     EXPECT_GT(full.size(), cropped.size());
 }
 
+TEST(Render, CropUsesXywhOrder) {
+    double data[20];
+    for (int i = 0; i < 20; i++) data[i] = static_cast<double>(i);
+
+    double expected[] = {7.0, 8.0, 12.0, 13.0};
+    std::string cropped = render_to_string(data, 4, 5, Options().crop(2, 1, 2, 2));
+    std::string direct = render_to_string(expected, 2, 2);
+
+    EXPECT_EQ(cropped, direct);
+}
+
 TEST(Render, CropOutOfBoundsProducesNothing) {
     double data[] = {1.0, 2.0, 3.0, 4.0};
     // crop start beyond matrix dimensions
@@ -556,6 +585,50 @@ TEST(Render, CropTwoArgShowsFromOriginToEnd) {
     // Should be smaller than full output (3x3 vs 4x4)
     std::string full = render_to_string(data, 4, 4);
     EXPECT_GT(full.size(), out.size());
+}
+
+TEST(Render, CenterCropMatchesEquivalentExplicitCrop) {
+    double data[30];
+    for (int i = 0; i < 30; i++) data[i] = static_cast<double>(i);
+
+    std::string centered = render_to_string(data, 5, 6,
+        Options().center_crop(2, 3, 3, 4));
+    std::string explicit_crop = render_to_string(data, 5, 6,
+        Options().crop(1, 1, 3, 4));
+
+    EXPECT_EQ(centered, explicit_crop);
+}
+
+TEST(Render, CenterCropClipsAtMatrixEdge) {
+    double data[25];
+    for (int i = 0; i < 25; i++) data[i] = static_cast<double>(i);
+
+    std::string centered = render_to_string(data, 5, 5,
+        Options().center_crop(0, 0, 3, 3));
+    std::string explicit_crop = render_to_string(data, 5, 5,
+        Options().crop(0, 0, 2, 2));
+
+    EXPECT_EQ(centered, explicit_crop);
+}
+
+TEST(Render, CenterCropOutOfBoundsProducesNothing) {
+    double data[] = {1.0, 2.0, 3.0, 4.0};
+    std::string out = render_to_string(data, 2, 2,
+        Options().center_crop(10, 10, 3, 3));
+
+    EXPECT_EQ(out, "");
+}
+
+TEST(Render, CenterCropWorksForRgbInput) {
+    std::uint8_t data[4 * 4 * 3];
+    for (int i = 0; i < 4 * 4 * 3; i++) data[i] = static_cast<std::uint8_t>(i);
+
+    std::string centered = capture_rgb_output(data, 4, 4, RGBLayout::Interleaved,
+        Options().center_crop(2, 2, 2, 2));
+    std::string explicit_crop = capture_rgb_output(data, 4, 4, RGBLayout::Interleaved,
+        Options().crop(1, 1, 2, 2));
+
+    EXPECT_EQ(centered, explicit_crop);
 }
 
 // ---------------------------------------------------------------------------
@@ -1251,7 +1324,7 @@ TEST(Title, SummaryIncludesCrop) {
     Options opts;
     opts.title().crop(1, 2, 3, 4).colormap("viridis");
 
-    EXPECT_EQ(render_title(opts, 10, 20, 1, 2, 3, 4, 3, 4, false),
+    EXPECT_EQ(render_title(opts, 10, 20, 2, 1, 4, 3, 4, 3, false),
         "termimage: data=10x20 crop=(1,2 3x4) cmap=viridis");
 }
 
@@ -1272,7 +1345,7 @@ TEST(Title, RgbSummaryIncludesRgbLayout) {
     opts.title("rgb frame").layout(Layout::ColMajor).block_size(2);
 
     EXPECT_EQ(render_rgb_title(opts, "planar",
-            10, 20, 1, 2, 3, 4, 3, 4, false),
+            10, 20, 2, 1, 4, 3, 4, 3, false),
         "rgb frame: data=10x20 crop=(1,2 3x4) rgb=planar layout=col-major block=2");
 }
 

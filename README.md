@@ -191,8 +191,9 @@ All setters are chainable and return `Options&`.
 | `.accessor(lambda)` | `.has_accessor()` | Select scalar accessor source mode. The callable receives `(row, col)` and returns a scalar value. |
 | `.rgb_accessor(lambda)` | `.has_rgb_accessor()` | Select RGB accessor source mode. The callable receives `(row, col)` and returns `termimage::Color`. |
 | `.ostream(os)` | `.ostream()` | Output stream. Default: `std::cout`. |
-| `.crop(r0, c0)` | `.crop_r0()` / `.crop_c0()` | Crop from `(r0, c0)` to end of matrix. |
-| `.crop(r0, c0, h, w)` | `.crop_h()` / `.crop_w()` | Crop a `h × w` subregion starting at `(r0, c0)`. |
+| `.crop(x, y)` | `.crop_x()` / `.crop_y()` | Crop from `(x, y)` to end of matrix, where `x` is column and `y` is row. |
+| `.crop(x, y, w, h)` | `.crop_w()` / `.crop_h()` | Crop a `w × h` subregion starting at `(x, y)`. |
+| `.center_crop(center_x, center_y, w, h)` | `.crop_center_x()` / `.crop_center_y()` | Crop a `w × h` chip centered on `(center_x, center_y)`, clipped to the matrix edges. |
 | `.fit(Fit)` | `.fit()` | Behavior when the image exceeds the terminal. Default: `Fit::Resample`. |
 | `.resampling(Resampling)` | `.resampling()` | Strategy used by `Fit::Resample`: `Resampling::Bilinear` (default) or `Resampling::Nearest`. |
 | `.title()` / `.title("label")` | `.show_title()` / `.title_text()` | Prepend a concise info line with data size, crop, display size when resized, colormap, and non-default layout/block size. Default: off. |

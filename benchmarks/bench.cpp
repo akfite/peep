@@ -306,7 +306,7 @@ int main(int argc, char** argv) {
         auto data = make_gradient(200, 300);
         results.push_back(run_bench(
             "large_gradient_crop", data.data(), 200, 300,
-            termimage::Options().colormap("viridis").crop(50, 50, 100, 200),
+            termimage::Options().colormap("viridis").crop(50, 50, 200, 100),
             iters(100), mode));
     }
 
@@ -347,7 +347,7 @@ int main(int argc, char** argv) {
         results.push_back(run_rgb_bench(
             "rgb_blocks_crop", data.data(), 200, 300,
             termimage::RGBLayout::Interleaved,
-            termimage::Options().crop(50, 50, 100, 200),
+            termimage::Options().crop(50, 50, 200, 100),
             iters(100), mode));
     }
 
