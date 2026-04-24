@@ -878,6 +878,22 @@ TEST(Fit, BlockSizeLargerThanTerminalClampsToOne) {
     EXPECT_TRUE(r.resample);
 }
 
+TEST(Clim, AutoClimScansWholeVisibleSourceRegion) {
+    double values[] = {
+        0.0, 100.0, 1.0,
+        2.0, 3.0, 4.0
+    };
+    double lo = NAN;
+    double hi = NAN;
+
+    apply_auto_clim(2, 3,
+        [&](size_t r, size_t c) { return values[r * 3 + c]; },
+        lo, hi, true, true);
+
+    EXPECT_DOUBLE_EQ(lo, 0.0);
+    EXPECT_DOUBLE_EQ(hi, 100.0);
+}
+
 TEST(Fit, OstringstreamRendersIdenticallyAcrossModes) {
     // ostringstream is not a tty, so Resample / Trim / Off must produce the
     // same bytes. This guards against accidentally activating fit on non-tty
@@ -913,6 +929,14 @@ TEST(Title, CustomLabelAndNonDefaultOptionsAppearInSummary) {
                  .block_size(2));
 
     EXPECT_EQ(out.find("frame 7: data=2x2 cmap=turbo layout=col-major block=2\n"), 0u);
+}
+
+TEST(Title, ControlCharactersAreSanitized) {
+    double data[] = {1.0};
+    std::string label = std::string("bad") + '\x1b' + "[31m\nnext";
+    std::string out = to_string(data, 1, 1, Options().title(label));
+
+    EXPECT_EQ(out.find("bad [31m next: data=1x1 cmap=gray\n"), 0u);
 }
 
 TEST(Title, SummaryIncludesCrop) {

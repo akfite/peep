@@ -76,8 +76,10 @@ void print(const std::vector<T>& data, size_t rows, size_t cols,
            const Options& opts = Options());
 ```
 
-Renders a `rows × cols` matrix as a colored image on the terminal. The vector
-overload validates that `data.size() == rows * cols`.
+Renders a `rows × cols` matrix as a colored image on the terminal. Pointer
+inputs are intentionally simple and work with custom containers; their
+dimensions are trusted. The vector overload validates that
+`data.size() == rows * cols`.
 
 ### `termimage::Options`
 

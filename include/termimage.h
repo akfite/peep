@@ -425,13 +425,23 @@ inline void emit_lower_half(std::ostream& os) { os << "\xe2\x96\x84"; }
 // U+2580 UPPER HALF BLOCK (UTF-8: E2 96 80)
 inline void emit_upper_half(std::ostream& os) { os << "\xe2\x96\x80"; }
 
+inline std::string sanitize_title_text(const std::string& s) {
+    std::string out;
+    out.reserve(s.size());
+    for (size_t i = 0; i < s.size(); ++i) {
+        unsigned char c = static_cast<unsigned char>(s[i]);
+        out.push_back((c < 0x20 || c == 0x7f) ? ' ' : s[i]);
+    }
+    return out;
+}
+
 inline std::string render_title(const Options& opts, size_t rows, size_t cols,
                                 size_t r0, size_t c0, size_t vr, size_t vc,
                                 size_t out_r, size_t out_c,
                                 bool resample) {
     std::ostringstream ss;
     const std::string& label = opts.title_text();
-    ss << (label.empty() ? "termimage" : label) << ": ";
+    ss << (label.empty() ? "termimage" : sanitize_title_text(label)) << ": ";
     ss << "data=" << rows << 'x' << cols;
 
     const bool cropped = (r0 != 0 || c0 != 0 || vr != rows || vc != cols);
@@ -448,6 +458,26 @@ inline std::string render_title(const Options& opts, size_t rows, size_t cols,
     if (opts.layout() == Layout::ColMajor) ss << " layout=col-major";
     if (opts.block_size() != 1) ss << " block=" << opts.block_size();
     return ss.str();
+}
+
+template <typename Get>
+inline void apply_auto_clim(size_t rows, size_t cols, Get get,
+                            double& lo, double& hi,
+                            bool auto_lo, bool auto_hi) {
+    if (!auto_lo && !auto_hi) return;
+
+    double flo = std::numeric_limits<double>::infinity();
+    double fhi = -std::numeric_limits<double>::infinity();
+    for (size_t r = 0; r < rows; ++r) {
+        for (size_t c = 0; c < cols; ++c) {
+            double v = get(r, c);
+            if (std::isnan(v) || std::isinf(v)) continue;
+            if (v < flo) flo = v;
+            if (v > fhi) fhi = v;
+        }
+    }
+    if (auto_lo) lo = flo;
+    if (auto_hi) hi = fhi;
 }
 
 template <typename T>
@@ -481,13 +511,16 @@ void render(const T* data, size_t rows, size_t cols, const Options& opts) {
     // Element accessor (output-matrix coords, maps to source via resample or identity).
     // Bresenham-style index scaling: when out == v, (mr*vr)/out_r == mr (identity), so
     // resample=true with no shrink is a no-op. trim uses identity sampling directly.
-    auto get = [&](size_t mr, size_t mc) -> double {
-        size_t sr = resample ? (mr * vr) / out_r : mr;
-        size_t sc = resample ? (mc * vc) / out_c : mc;
+    auto get_source = [&](size_t sr, size_t sc) -> double {
         if (col_major)
             return static_cast<double>(data[(c0 + sc) * rows + (r0 + sr)]);
         else
             return static_cast<double>(data[(r0 + sr) * cols + (c0 + sc)]);
+    };
+    auto get = [&](size_t mr, size_t mc) -> double {
+        size_t sr = resample ? (mr * vr) / out_r : mr;
+        size_t sc = resample ? (mc * vc) / out_c : mc;
+        return get_source(sr, sc);
     };
 
     // Compute clim from visible region only
@@ -496,20 +529,7 @@ void render(const T* data, size_t rows, size_t cols, const Options& opts) {
     bool auto_lo = std::isnan(lo);
     bool auto_hi = std::isnan(hi);
 
-    if (auto_lo || auto_hi) {
-        double flo = std::numeric_limits<double>::infinity();
-        double fhi = -std::numeric_limits<double>::infinity();
-        for (size_t mr = 0; mr < out_r; ++mr) {
-            for (size_t mc = 0; mc < out_c; ++mc) {
-                double v = get(mr, mc);
-                if (std::isnan(v) || std::isinf(v)) continue;
-                if (v < flo) flo = v;
-                if (v > fhi) fhi = v;
-            }
-        }
-        if (auto_lo) lo = flo;
-        if (auto_hi) hi = fhi;
-    }
+    apply_auto_clim(vr, vc, get_source, lo, hi, auto_lo, auto_hi);
 
     if (std::isinf(lo) || std::isinf(hi)) { lo = 0.0; hi = 1.0; }
     double range = (hi != lo) ? (hi - lo) : 1.0;
