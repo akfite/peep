@@ -19,7 +19,7 @@ TEST(Options, DefaultValues) {
     Options opts;
     EXPECT_TRUE(std::isnan(opts.clim_lo()));
     EXPECT_TRUE(std::isnan(opts.clim_hi()));
-    EXPECT_EQ(opts.colormap(), Colormap::Gray);
+    EXPECT_EQ(opts.colormap(), Colormap::Viridis);
     EXPECT_EQ(opts.block_size(), 1);
     EXPECT_EQ(opts.layout(), Layout::RowMajor);
     EXPECT_EQ(&opts.ostream(), &std::cout);
