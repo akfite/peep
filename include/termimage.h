@@ -140,7 +140,7 @@ inline void emit_upper_half(std::ostream& os) { os << "\xe2\x96\x80"; }
 
 template <typename T>
 void render(const T* data, int rows, int cols, const Options& opts) {
-    if (rows <= 0 || cols <= 0) return;
+    if (!data || rows <= 0 || cols <= 0) return;
 
     const unsigned char* cmap = find_colormap(opts.colormap());
     std::ostream& os = opts.ostream();
