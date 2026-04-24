@@ -37,9 +37,10 @@ if(TERMIMAGE_BUILD_BENCH)
 endif()
 
 # --- Tests -------------------------------------------------------------------
-option(TERMIMAGE_BUILD_TESTS "Build unit tests" OFF)
+option(TERMIMAGE_BUILD_TESTS "Build unit tests" ON)
 
 if(TERMIMAGE_BUILD_TESTS)
+    include(CTest)
     include(FetchContent)
     FetchContent_Declare(
         googletest
