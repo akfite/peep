@@ -20,6 +20,7 @@ std::string rendered = termimage::to_string(rgb_vector, n_rows, n_cols,
 - **Minimal requirements**: C++11 compiler and a modern terminal (with full color support)
 - **Color mapping** with support for `gray`, `viridis`, `plasma`, `inferno`, `magma`, `cividis`, `coolwarm`, `gnuplot`, and `turbo`
 - **Automatic or manual scaling**: computes `clim` from data, or you can set it yourself
+- **Default colorbar** for scalar images to show the displayed color scale
 - **Terminal auto-fit**: oversized images are resampled (or trimmed) to fit the window
 - **Crop**: render a subregion without copying data
 - **Upscale**: block upscale small matrices for visibility
@@ -173,6 +174,7 @@ All setters are chainable and return `Options&`.
 | `.fit(Fit)` | `.fit()` | Behavior when the image exceeds the terminal. Default: `Fit::Resample`. |
 | `.resampling(Resampling)` | `.resampling()` | Strategy used by `Fit::Resample`: `Resampling::Bilinear` (default) or `Resampling::Nearest`. |
 | `.title()` / `.title("label")` | `.show_title()` / `.title_text()` | Prepend a concise info line with data size, crop, display size when resized, colormap, and non-default layout/block size. Default: off. |
+| `.colorbar()` / `.colorbar(false)` | `.show_colorbar()` | Append a scalar color scale below the image with the displayed clim low/high labels. Ignored for RGB input. Default: on for scalar images. |
 
 ### Enums
 

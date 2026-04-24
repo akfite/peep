@@ -36,7 +36,8 @@ int main() {
         for (size_t i = 0; i < sizeof(colormaps) / sizeof(colormaps[0]); ++i) {
             std::cout << colormaps[i].name << std::endl;
             termimage::print(grad, 1, cols,
-                termimage::Options().colormap(colormaps[i].colormap));
+                termimage::Options().colormap(colormaps[i].colormap)
+                                    .colorbar(false));
         }
     }
     std::cout << std::endl;
@@ -84,16 +85,17 @@ int main() {
     }
     std::cout << std::endl;
 
-    // 3. Square 2D Gaussian (magma, block_size=2)
-    std::cout << "=== 2D Gaussian (magma, block_size=2) ===" << std::endl;
+    // 3. Square 2D Gaussian scaled by pi (magma, block_size=2)
+    std::cout << "=== 2D Gaussian x pi (magma, block_size=2) ===" << std::endl;
     {
         const int n = 25;
+        const double pi = 3.14159265358979323846;
         std::vector<double> gauss(n * n);
         double center = (n - 1) / 2.0;
         double sigma = n / 5.0;
         for (int r = 0; r < n; ++r)
             for (int c = 0; c < n; ++c)
-                gauss[r * n + c] = std::exp(
+                gauss[r * n + c] = pi * std::exp(
                     -0.5 * ((c - center) * (c - center)
                           + (r - center) * (r - center))
                     / (sigma * sigma));

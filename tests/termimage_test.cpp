@@ -41,6 +41,7 @@ TEST(Options, DefaultValues) {
     EXPECT_FALSE(opts.has_rgb_accessor());
     EXPECT_FALSE(opts.show_title());
     EXPECT_EQ(opts.title_text(), "");
+    EXPECT_TRUE(opts.show_colorbar());
 }
 
 TEST(Options, ChainableSetters) {
@@ -54,7 +55,8 @@ TEST(Options, ChainableSetters) {
                        .crop(4, 5, 6, 7)
                        .fit(Fit::Trim)
                        .resampling(Resampling::Nearest)
-                       .title("demo");
+                       .title("demo")
+                       .colorbar();
 
     // Chaining must return the same object
     EXPECT_EQ(&ref, &opts);
@@ -73,6 +75,8 @@ TEST(Options, ChainableSetters) {
     EXPECT_EQ(opts.resampling(), Resampling::Nearest);
     EXPECT_TRUE(opts.show_title());
     EXPECT_EQ(opts.title_text(), "demo");
+    EXPECT_TRUE(opts.show_colorbar());
+    EXPECT_FALSE(opts.colorbar(false).show_colorbar());
 }
 
 TEST(Options, RgbAndAccessorSetters) {
@@ -283,7 +287,7 @@ static std::string render_to_string(const double* data, size_t rows, size_t cols
                                      const Options& base = Options()) {
     std::ostringstream oss;
     Options opts = base;
-    opts.ostream(oss);
+    opts.ostream(oss).colorbar(false);
     termimage::print(data, rows, cols, opts);
     return oss.str();
 }
@@ -1224,6 +1228,50 @@ TEST(Title, RgbSummaryIncludesRgbLayout) {
 }
 
 // ---------------------------------------------------------------------------
+// Colorbar
+// ---------------------------------------------------------------------------
+
+TEST(Colorbar, AppendsScaleBelowScalarImage) {
+    double data[] = {0.0, 1.0};
+    std::string out = to_string(data, 1, 2,
+        Options().colormap("gray").clim(-2.5, 7.5));
+
+    int newlines = 0;
+    for (char ch : out) if (ch == '\n') newlines++;
+    EXPECT_EQ(newlines, 2);
+    EXPECT_NE(out.find("\n-2.5 "), std::string::npos);
+    EXPECT_NE(out.find(" 7.5\n"), std::string::npos);
+    EXPECT_NE(out.find("\x1b[48;2;128;128;128m"), std::string::npos);
+}
+
+TEST(Colorbar, CanBeDisabled) {
+    double data[] = {0.0, 1.0};
+    std::string out = to_string(data, 1, 2,
+        Options().colormap("gray").colorbar(false));
+
+    int newlines = 0;
+    for (char ch : out) if (ch == '\n') newlines++;
+    EXPECT_EQ(newlines, 1);
+    EXPECT_EQ(out.find("\n0 "), std::string::npos);
+}
+
+TEST(Colorbar, UsesAutoClimLabels) {
+    double data[] = {3.0, 0.0};
+    std::string out = to_string(data, 1, 2,
+        Options().colormap("gray"));
+
+    EXPECT_NE(out.find("\n0 "), std::string::npos);
+    EXPECT_NE(out.find(" 3\n"), std::string::npos);
+}
+
+TEST(Colorbar, IgnoredForRgbImage) {
+    const std::uint8_t data[] = {255, 0, 0};
+
+    EXPECT_EQ(to_string(data, 1, 1, Options().rgb()),
+              to_string(data, 1, 1, Options().rgb().colorbar(false)));
+}
+
+// ---------------------------------------------------------------------------
 // to_string convenience function
 // ---------------------------------------------------------------------------
 
@@ -1232,8 +1280,9 @@ TEST(ToString, MatchesPrintOutput) {
     // to_string should produce the same output as print-to-ostringstream
     std::string via_tostring = to_string(data, 2, 2,
         Options().colormap("magma"));
-    std::string via_print = render_to_string(data, 2, 2,
-        Options().colormap("magma"));
+    std::ostringstream oss;
+    print(data, 2, 2, Options().ostream(oss).colormap("magma"));
+    std::string via_print = oss.str();
     EXPECT_EQ(via_tostring, via_print);
 }
 
@@ -1294,7 +1343,7 @@ TEST(VectorApi, PrintMatchesPointerInput) {
     std::ostringstream oss;
     print(data, 2, 2, Options().ostream(oss).colormap("magma"));
 
-    EXPECT_EQ(oss.str(), render_to_string(data.data(), 2, 2,
+    EXPECT_EQ(oss.str(), to_string(data.data(), 2, 2,
         Options().colormap("magma")));
 }
 

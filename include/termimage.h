@@ -146,7 +146,7 @@ struct Options {
         source_mode_(detail::SourceMode::ScalarData),
         rgb_layout_(RGBLayout::Interleaved),
         scalar_accessor_(), rgb_accessor_(),
-        title_() {}
+        title_(), colorbar_(true) {}
 
     // Getters
     double clim_lo() const { return clim_lo_; }
@@ -186,6 +186,7 @@ struct Options {
     const RGBAccessor& rgb_accessor() const { return rgb_accessor_; }
     bool show_title() const { return title_.show; }
     const std::string& title_text() const { return title_.text; }
+    bool show_colorbar() const { return colorbar_; }
 
     // Chainable setters
     Options& clim(double lo, double hi) { clim_lo_ = lo; clim_hi_ = hi; return *this; }
@@ -304,6 +305,10 @@ struct Options {
         title_.assign(text ? text : "");
         return *this;
     }
+    Options& colorbar(bool enabled = true) {
+        colorbar_ = enabled;
+        return *this;
+    }
 
 private:
     double clim_lo_;
@@ -327,6 +332,7 @@ private:
     ScalarAccessor scalar_accessor_;
     RGBAccessor rgb_accessor_;
     detail::TitleOptions title_;
+    bool colorbar_;
 };
 
 // public API
@@ -697,6 +703,38 @@ inline void emit_pixel_body(std::ostringstream& buf, size_t out_r, size_t out_c,
     }
 }
 
+inline std::string format_colorbar_value(double v) {
+    std::ostringstream ss;
+    ss << v;
+    return ss.str();
+}
+
+inline void emit_colorbar(std::ostringstream& buf, const ColormapLut& cmap,
+                          double lo, double hi, size_t image_cols) {
+    if (image_cols == 0) return;
+
+    const std::string lo_label = format_colorbar_value(lo);
+    const std::string hi_label = format_colorbar_value(hi);
+    size_t bar_width = image_cols;
+    const size_t label_width = lo_label.size() + hi_label.size() + 2;
+    if (image_cols > label_width) {
+        bar_width = image_cols - label_width;
+    } else {
+        bar_width = 1;
+    }
+
+    buf << lo_label << ' ';
+    for (size_t i = 0; i < bar_width; ++i) {
+        const double t = (bar_width > 1)
+            ? static_cast<double>(i) / static_cast<double>(bar_width - 1)
+            : 0.5;
+        emit_bg(buf, lookup(t, cmap));
+        buf << ' ';
+    }
+    emit_reset(buf);
+    buf << ' ' << hi_label << '\n';
+}
+
 inline std::string sanitize_title_text(const std::string& s) {
     std::string out;
     out.reserve(s.size());
@@ -957,6 +995,9 @@ void render_scalar_source(size_t rows, size_t cols, GetSource get_source_abs,
     };
 
     emit_pixel_body(buf, out_r, out_c, bs, pixel_at);
+    if (opts.show_colorbar()) {
+        emit_colorbar(buf, cmap, lo, hi, out_c * bs);
+    }
 
     os << buf.str();
 }
