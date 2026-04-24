@@ -1,6 +1,7 @@
 #include "termimage.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -40,7 +41,49 @@ int main() {
     }
     std::cout << std::endl;
 
-    // 2. Square 2D Gaussian (magma, block_size=2)
+    // 2. RGB uint8 image. 2x4 color chart makes channel/order mistakes obvious.
+    std::cout << "=== RGB uint8 color chart (interleaved, block_size=2) ===" << std::endl;
+    {
+        const int rows = 16;
+        const int cols = 32;
+        std::vector<std::uint8_t> rgb(rows * cols * 3);
+
+        const std::uint8_t colors[2][4][3] = {
+            {
+                {255, 0, 0},     // red, top-left
+                {0, 255, 0},     // green
+                {0, 0, 255},     // blue
+                {255, 255, 255}  // white, top-right
+            },
+            {
+                {0, 255, 255},   // cyan, bottom-left
+                {255, 0, 255},   // magenta
+                {255, 255, 0},   // yellow
+                {0, 0, 0}        // black, bottom-right
+            }
+        };
+
+        for (int r = 0; r < rows; ++r) {
+            for (int c = 0; c < cols; ++c) {
+                const int tile_r = r / (rows / 2);
+                const int tile_c = c / (cols / 4);
+                size_t i = static_cast<size_t>(r * cols + c) * 3;
+                rgb[i + 0] = colors[tile_r][tile_c][0];
+                rgb[i + 1] = colors[tile_r][tile_c][1];
+                rgb[i + 2] = colors[tile_r][tile_c][2];
+            }
+        }
+        std::cout << "top: red | green | blue | white" << std::endl;
+        std::cout << "bot: cyan | magenta | yellow | black" << std::endl;
+        termimage::print_rgb(rgb, rows, cols,
+            termimage::Options()
+                .block_size(2)
+                .resampling(termimage::Resampling::Nearest)
+                .title("rgb chart"));
+    }
+    std::cout << std::endl;
+
+    // 3. Square 2D Gaussian (magma, block_size=2)
     std::cout << "=== 2D Gaussian (magma, block_size=2) ===" << std::endl;
     {
         const int n = 25;
@@ -58,7 +101,7 @@ int main() {
     }
     std::cout << std::endl;
 
-    // 3. Checkerboard with NaN holes (viridis)
+    // 4. Checkerboard with NaN holes (viridis)
     std::cout << "=== Checkerboard + NaN (viridis) ===" << std::endl;
     {
         const int rows = 10, cols = 20;
@@ -76,7 +119,7 @@ int main() {
     }
     std::cout << std::endl;
 
-    // 4. 8x8 integer ramp, cropped to a 4x6 window starting at (2,1)
+    // 5. 8x8 integer ramp, cropped to a 4x6 window starting at (2,1)
     std::cout << "=== 8x8 integers, cropped to (2,1) 4x6 (gray, block_size=3) ===" << std::endl;
     {
         int mat[64];
@@ -87,7 +130,7 @@ int main() {
     }
     std::cout << std::endl;
 
-    // 5. Inf handling with explicit clim
+    // 6. Inf handling with explicit clim
     std::cout << "=== Inf handling (magma, block_size=3) ===" << std::endl;
     {
         double inf = std::numeric_limits<double>::infinity();
@@ -100,7 +143,7 @@ int main() {
     }
     std::cout << std::endl;
 
-    // 6. MATLAB peaks — oversized to demonstrate terminal auto-fit (resample).
+    // 7. MATLAB peaks — oversized to demonstrate terminal auto-fit (resample).
     //    The source grid is much larger than any terminal; Fit::Resample
     //    (the default) downsamples it with bilinear interpolation.
     std::cout << "=== MATLAB peaks (viridis, 1000x1000 resampled to fit) ===" << std::endl;

@@ -37,6 +37,7 @@ struct Color {
 };
 
 enum class Layout { RowMajor, ColMajor };
+enum class RGBLayout { Interleaved, Planar };
 enum class Resampling { Nearest, Bilinear };
 enum class Colormap {
     Gray,
@@ -290,11 +291,32 @@ std::string to_string(const T* data, size_t rows, size_t cols,
 template <typename T>
 std::string to_string(const std::vector<T>& data, size_t rows, size_t cols,
                       const Options& opts = Options());
+void print_rgb(const std::uint8_t* data, size_t rows, size_t cols,
+               const Options& opts = Options());
+void print_rgb(const std::uint8_t* data, size_t rows, size_t cols,
+               RGBLayout rgb_layout, const Options& opts = Options());
+void print_rgb(const std::vector<std::uint8_t>& data, size_t rows, size_t cols,
+               const Options& opts = Options());
+void print_rgb(const std::vector<std::uint8_t>& data, size_t rows, size_t cols,
+               RGBLayout rgb_layout, const Options& opts = Options());
+std::string rgb_to_string(const std::uint8_t* data, size_t rows, size_t cols,
+                          const Options& opts = Options());
+std::string rgb_to_string(const std::uint8_t* data, size_t rows, size_t cols,
+                          RGBLayout rgb_layout, const Options& opts = Options());
+std::string rgb_to_string(const std::vector<std::uint8_t>& data, size_t rows, size_t cols,
+                          const Options& opts = Options());
+std::string rgb_to_string(const std::vector<std::uint8_t>& data, size_t rows, size_t cols,
+                          RGBLayout rgb_layout, const Options& opts = Options());
 
 // internal API
 namespace detail {
 
 typedef Color RGB;
+
+struct Pixel {
+    RGB color;
+    bool transparent;
+};
 
 // Computed grayscale colormap (avoids embedding trivial data)
 inline const ColormapLut& cmap_gray() {
@@ -454,6 +476,20 @@ inline RGB color_for_value(double v, const ColormapLut& cmap, const Options& opt
     return lookup(normalized, cmap);
 }
 
+inline Pixel transparent_pixel() {
+    Pixel p;
+    p.color = RGB{0, 0, 0};
+    p.transparent = true;
+    return p;
+}
+
+inline Pixel opaque_pixel(RGB c) {
+    Pixel p;
+    p.color = c;
+    p.transparent = false;
+    return p;
+}
+
 inline void emit_bg(std::ostream& os, RGB c) {
     os << "\x1b[48;2;"
         << static_cast<int>(c.r) << ';'
@@ -475,6 +511,77 @@ inline void emit_lower_half(std::ostream& os) { os << "\xe2\x96\x84"; }
 
 // U+2580 UPPER HALF BLOCK (UTF-8: E2 96 80)
 inline void emit_upper_half(std::ostream& os) { os << "\xe2\x96\x80"; }
+
+template <typename PixelAt>
+inline void emit_pixel_body(std::ostringstream& buf, size_t out_r, size_t out_c,
+                            size_t bs, PixelAt pixel_at) {
+    size_t prows = out_r * bs;
+    size_t pcols = out_c * bs;
+
+    RGB cur_bg = {0, 0, 0}, cur_fg = {0, 0, 0};
+    bool bg_set = false, fg_set = false;
+
+    auto do_reset = [&]() {
+        if (bg_set || fg_set) {
+            emit_reset(buf);
+            bg_set = false;
+            fg_set = false;
+        }
+    };
+
+    auto set_bg = [&](RGB c) {
+        if (!bg_set || cur_bg != c) {
+            emit_bg(buf, c);
+            cur_bg = c;
+            bg_set = true;
+        }
+    };
+
+    auto set_fg = [&](RGB c) {
+        if (!fg_set || cur_fg != c) {
+            emit_fg(buf, c);
+            cur_fg = c;
+            fg_set = true;
+        }
+    };
+
+    for (size_t pr = 0; pr < prows; pr += 2) {
+        bool has_bot = (pr + 1 < prows);
+
+        for (size_t pc = 0; pc < pcols; ++pc) {
+            size_t mr_top = pr / bs;
+            size_t mc = pc / bs;
+            Pixel top = pixel_at(mr_top, mc);
+            Pixel bot = transparent_pixel();
+            if (has_bot) {
+                size_t mr_bot = (pr + 1) / bs;
+                bot = pixel_at(mr_bot, mc);
+            }
+
+            if (top.transparent && bot.transparent) {
+                do_reset();
+                buf << ' ';
+            } else if (top.transparent) {
+                do_reset();
+                set_fg(bot.color);
+                emit_lower_half(buf);
+            } else if (bot.transparent) {
+                do_reset();
+                set_fg(top.color);
+                emit_upper_half(buf);
+            } else {
+                set_bg(top.color);
+                set_fg(bot.color);
+                emit_lower_half(buf);
+            }
+        }
+
+        do_reset();
+        buf << '\n';
+        bg_set = false;
+        fg_set = false;
+    }
+}
 
 inline std::string sanitize_title_text(const std::string& s) {
     std::string out;
@@ -506,6 +613,36 @@ inline std::string render_title(const Options& opts, size_t rows, size_t cols,
     }
 
     ss << " cmap=" << (opts.has_custom_colormap() ? "custom" : colormap_name(opts.colormap()));
+    if (opts.layout() == Layout::ColMajor) ss << " layout=col-major";
+    if (opts.block_size() != 1) ss << " block=" << opts.block_size();
+    return ss.str();
+}
+
+inline const char* rgb_layout_name(RGBLayout layout) {
+    return (layout == RGBLayout::Planar) ? "planar" : "interleaved";
+}
+
+inline std::string render_rgb_title(const Options& opts, RGBLayout rgb_layout,
+                                    size_t rows, size_t cols,
+                                    size_t r0, size_t c0, size_t vr, size_t vc,
+                                    size_t out_r, size_t out_c,
+                                    bool resample) {
+    std::ostringstream ss;
+    const std::string& label = opts.title_text();
+    ss << (label.empty() ? "termimage" : sanitize_title_text(label)) << ": ";
+    ss << "data=" << rows << 'x' << cols;
+
+    const bool cropped = (r0 != 0 || c0 != 0 || vr != rows || vc != cols);
+    if (cropped) {
+        ss << " crop=(" << r0 << ',' << c0 << ' ' << vr << 'x' << vc << ')';
+    }
+
+    if (out_r != vr || out_c != vc) {
+        ss << " display=" << out_r << 'x' << out_c;
+        ss << (resample ? " resampled" : " trimmed");
+    }
+
+    ss << " rgb=" << rgb_layout_name(rgb_layout);
     if (opts.layout() == Layout::ColMajor) ss << " layout=col-major";
     if (opts.block_size() != 1) ss << " block=" << opts.block_size();
     return ss.str();
@@ -594,6 +731,59 @@ inline double sample_resampled(size_t mr, size_t mc, size_t out_r, size_t out_c,
     return sample_bilinear(mr, mc, out_r, out_c, src_r, src_c, get);
 }
 
+inline std::uint8_t clamp_channel(double v) {
+    if (v <= 0.0) return 0;
+    if (v >= 255.0) return 255;
+    return static_cast<std::uint8_t>(v + 0.5);
+}
+
+inline RGB blend_rgb(RGB c00, RGB c01, RGB c10, RGB c11,
+                     double w00, double w01, double w10, double w11) {
+    RGB c;
+    c.r = clamp_channel(c00.r * w00 + c01.r * w01 + c10.r * w10 + c11.r * w11);
+    c.g = clamp_channel(c00.g * w00 + c01.g * w01 + c10.g * w10 + c11.g * w11);
+    c.b = clamp_channel(c00.b * w00 + c01.b * w01 + c10.b * w10 + c11.b * w11);
+    return c;
+}
+
+template <typename Get>
+inline RGB sample_rgb_nearest(size_t mr, size_t mc, size_t out_r, size_t out_c,
+                              size_t src_r, size_t src_c, Get get) {
+    size_t sr = (mr * src_r) / out_r;
+    size_t sc = (mc * src_c) / out_c;
+    return get(sr, sc);
+}
+
+template <typename Get>
+inline RGB sample_rgb_bilinear(size_t mr, size_t mc, size_t out_r, size_t out_c,
+                               size_t src_r, size_t src_c, Get get) {
+    const double r = resample_coord(mr, out_r, src_r);
+    const double c = resample_coord(mc, out_c, src_c);
+    const size_t r0 = static_cast<size_t>(std::floor(r));
+    const size_t c0 = static_cast<size_t>(std::floor(c));
+    const size_t r1 = std::min(r0 + 1, src_r - 1);
+    const size_t c1 = std::min(c0 + 1, src_c - 1);
+    const double wr = r - static_cast<double>(r0);
+    const double wc = c - static_cast<double>(c0);
+
+    const double w00 = (1.0 - wr) * (1.0 - wc);
+    const double w01 = (1.0 - wr) * wc;
+    const double w10 = wr * (1.0 - wc);
+    const double w11 = wr * wc;
+    return blend_rgb(get(r0, c0), get(r0, c1), get(r1, c0), get(r1, c1),
+                     w00, w01, w10, w11);
+}
+
+template <typename Get>
+inline RGB sample_rgb_resampled(size_t mr, size_t mc, size_t out_r, size_t out_c,
+                                size_t src_r, size_t src_c, Get get,
+                                Resampling resampling) {
+    if (resampling == Resampling::Nearest) {
+        return sample_rgb_nearest(mr, mc, out_r, out_c, src_r, src_c, get);
+    }
+    return sample_rgb_bilinear(mr, mc, out_r, out_c, src_r, src_c, get);
+}
+
 template <typename T>
 void render(const T* data, size_t rows, size_t cols, const Options& opts) {
     if (!data || rows == 0 || cols == 0) return;
@@ -656,10 +846,6 @@ void render(const T* data, size_t rows, size_t cols, const Options& opts) {
         return n;
     };
 
-    // Render in pixel space: each output matrix element maps to a bs x bs block
-    size_t prows = out_r * bs;
-    size_t pcols = out_c * bs;
-
     // Buffer all output, then flush once
     std::ostringstream buf;
     if (opts.show_title()) {
@@ -667,75 +853,72 @@ void render(const T* data, size_t rows, size_t cols, const Options& opts) {
             << '\n';
     }
 
-    // Track current terminal color state to skip redundant escapes
-    RGB cur_bg = {0, 0, 0}, cur_fg = {0, 0, 0};
-    bool bg_set = false, fg_set = false;
-
-    auto do_reset = [&]() {
-        if (bg_set || fg_set) {
-            emit_reset(buf);
-            bg_set = false;
-            fg_set = false;
-        }
+    auto pixel_at = [&](size_t mr, size_t mc) -> Pixel {
+        double v = get(mr, mc);
+        if (std::isnan(v) && !opts.has_nan_color()) return transparent_pixel();
+        return opaque_pixel(color_for_value(v, cmap, opts, normalize(v)));
     };
 
-    auto set_bg = [&](RGB c) {
-        if (!bg_set || cur_bg != c) {
-            emit_bg(buf, c);
-            cur_bg = c;
-            bg_set = true;
-        }
+    emit_pixel_body(buf, out_r, out_c, bs, pixel_at);
+
+    os << buf.str();
+}
+
+inline void render_rgb(const std::uint8_t* data, size_t rows, size_t cols,
+                       RGBLayout rgb_layout, const Options& opts) {
+    if (!data || rows == 0 || cols == 0) return;
+
+    std::ostream& os = opts.ostream();
+    const size_t bs = opts.block_size();
+    const bool col_major = (opts.layout() == Layout::ColMajor);
+
+    size_t r0 = opts.crop_r0();
+    size_t c0 = opts.crop_c0();
+    if (r0 >= rows || c0 >= cols) return;
+    size_t vr = (opts.crop_h() == 0) ? (rows - r0) : opts.crop_h();
+    size_t vc = (opts.crop_w() == 0) ? (cols - c0) : opts.crop_w();
+    if (r0 + vr > rows) vr = rows - r0;
+    if (c0 + vc > cols) vc = cols - c0;
+    if (vr == 0 || vc == 0) return;
+
+    FitResolution fr = resolve_fit(vr, vc, bs, opts.fit(),
+                                   query_terminal_size(os));
+    const size_t out_r = fr.out_r;
+    const size_t out_c = fr.out_c;
+    const bool resample = fr.resample;
+    const size_t plane = rows * cols;
+
+    auto spatial_index = [&](size_t sr, size_t sc) -> size_t {
+        return col_major ? ((c0 + sc) * rows + (r0 + sr))
+                         : ((r0 + sr) * cols + (c0 + sc));
     };
 
-    auto set_fg = [&](RGB c) {
-        if (!fg_set || cur_fg != c) {
-            emit_fg(buf, c);
-            cur_fg = c;
-            fg_set = true;
+    auto get_source = [&](size_t sr, size_t sc) -> RGB {
+        const size_t i = spatial_index(sr, sc);
+        if (rgb_layout == RGBLayout::Planar) {
+            return RGB{data[i], data[plane + i], data[2 * plane + i]};
         }
+        const size_t j = i * 3;
+        return RGB{data[j], data[j + 1], data[j + 2]};
     };
 
-    for (size_t pr = 0; pr < prows; pr += 2) {
-        bool has_bot = (pr + 1 < prows);
+    auto get = [&](size_t mr, size_t mc) -> RGB {
+        if (!resample) return get_source(mr, mc);
+        return sample_rgb_resampled(mr, mc, out_r, out_c, vr, vc,
+                                    get_source, opts.resampling());
+    };
 
-        for (size_t pc = 0; pc < pcols; ++pc) {
-            size_t mr_top = pr / bs;
-            size_t mc = pc / bs;
-            double top_val = get(mr_top, mc);
-            bool top_transparent = std::isnan(top_val) && !opts.has_nan_color();
-
-            double bot_val = NAN;
-            bool bot_transparent = true;
-            if (has_bot) {
-                size_t mr_bot = (pr + 1) / bs;
-                bot_val = get(mr_bot, mc);
-                bot_transparent = std::isnan(bot_val) && !opts.has_nan_color();
-            }
-
-            if (top_transparent && bot_transparent) {
-                do_reset();
-                buf << ' ';
-            } else if (top_transparent) {
-                do_reset();
-                set_fg(color_for_value(bot_val, cmap, opts, normalize(bot_val)));
-                emit_lower_half(buf);
-            } else if (bot_transparent) {
-                do_reset();
-                set_fg(color_for_value(top_val, cmap, opts, normalize(top_val)));
-                emit_upper_half(buf);
-            } else {
-                set_bg(color_for_value(top_val, cmap, opts, normalize(top_val)));
-                set_fg(color_for_value(bot_val, cmap, opts, normalize(bot_val)));
-                emit_lower_half(buf);
-            }
-        }
-
-        do_reset();
-        buf << '\n';
-        // Reset tracking at line boundaries (reset was just emitted)
-        bg_set = false;
-        fg_set = false;
+    std::ostringstream buf;
+    if (opts.show_title()) {
+        buf << render_rgb_title(opts, rgb_layout, rows, cols,
+                                r0, c0, vr, vc, out_r, out_c, resample)
+            << '\n';
     }
+
+    auto pixel_at = [&](size_t mr, size_t mc) -> Pixel {
+        return opaque_pixel(get(mr, mc));
+    };
+    emit_pixel_body(buf, out_r, out_c, bs, pixel_at);
 
     os << buf.str();
 }
@@ -751,12 +934,37 @@ inline void validate_vector_size(size_t size, size_t rows, size_t cols) {
     }
 }
 
+inline void validate_rgb_vector_size(size_t size, size_t rows, size_t cols) {
+    if (rows == 0 || cols == 0) return;
+    if (cols != 0 && rows > (std::numeric_limits<size_t>::max() / cols)) {
+        throw std::invalid_argument("termimage RGB vector dimensions overflow size_t");
+    }
+    const size_t pixels = rows * cols;
+    if (pixels > (std::numeric_limits<size_t>::max() / 3)) {
+        throw std::invalid_argument("termimage RGB vector dimensions overflow size_t");
+    }
+    const size_t expected = pixels * 3;
+    if (size != expected) {
+        throw std::invalid_argument("termimage RGB vector size must equal rows * cols * 3");
+    }
+}
+
 template <typename T>
 std::string render_to_string(const T* data, size_t rows, size_t cols, const Options& opts = Options()) {
     std::ostringstream oss;
     Options local = opts;
     local.ostream(oss);
     render(data, rows, cols, local);
+    return oss.str();
+}
+
+inline std::string render_rgb_to_string(const std::uint8_t* data, size_t rows, size_t cols,
+                                        RGBLayout rgb_layout,
+                                        const Options& opts = Options()) {
+    std::ostringstream oss;
+    Options local = opts;
+    local.ostream(oss);
+    render_rgb(data, rows, cols, rgb_layout, local);
     return oss.str();
 }
 
@@ -783,6 +991,52 @@ template <typename T>
 std::string to_string(const std::vector<T>& data, size_t rows, size_t cols, const Options& opts) {
     detail::validate_vector_size(data.size(), rows, cols);
     return detail::render_to_string(data.data(), rows, cols, opts);
+}
+
+inline void print_rgb(const std::uint8_t* data, size_t rows, size_t cols,
+                      const Options& opts) {
+    detail::render_rgb(data, rows, cols, RGBLayout::Interleaved, opts);
+}
+
+inline void print_rgb(const std::uint8_t* data, size_t rows, size_t cols,
+                      RGBLayout rgb_layout, const Options& opts) {
+    detail::render_rgb(data, rows, cols, rgb_layout, opts);
+}
+
+inline void print_rgb(const std::vector<std::uint8_t>& data, size_t rows, size_t cols,
+                      const Options& opts) {
+    detail::validate_rgb_vector_size(data.size(), rows, cols);
+    detail::render_rgb(data.data(), rows, cols, RGBLayout::Interleaved, opts);
+}
+
+inline void print_rgb(const std::vector<std::uint8_t>& data, size_t rows, size_t cols,
+                      RGBLayout rgb_layout, const Options& opts) {
+    detail::validate_rgb_vector_size(data.size(), rows, cols);
+    detail::render_rgb(data.data(), rows, cols, rgb_layout, opts);
+}
+
+inline std::string rgb_to_string(const std::uint8_t* data, size_t rows, size_t cols,
+                                 const Options& opts) {
+    return detail::render_rgb_to_string(data, rows, cols, RGBLayout::Interleaved, opts);
+}
+
+inline std::string rgb_to_string(const std::uint8_t* data, size_t rows, size_t cols,
+                                 RGBLayout rgb_layout, const Options& opts) {
+    return detail::render_rgb_to_string(data, rows, cols, rgb_layout, opts);
+}
+
+inline std::string rgb_to_string(const std::vector<std::uint8_t>& data,
+                                 size_t rows, size_t cols, const Options& opts) {
+    detail::validate_rgb_vector_size(data.size(), rows, cols);
+    return detail::render_rgb_to_string(data.data(), rows, cols,
+                                        RGBLayout::Interleaved, opts);
+}
+
+inline std::string rgb_to_string(const std::vector<std::uint8_t>& data,
+                                 size_t rows, size_t cols,
+                                 RGBLayout rgb_layout, const Options& opts) {
+    detail::validate_rgb_vector_size(data.size(), rows, cols);
+    return detail::render_rgb_to_string(data.data(), rows, cols, rgb_layout, opts);
 }
 
 } // namespace termimage

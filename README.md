@@ -5,11 +5,14 @@ A tiny header-only C++11 library for debugging and visualizing 2D numeric arrays
 ```cpp
 termimage::print(data_ptr, n_rows, n_cols);
 termimage::print(data_vector, n_rows, n_cols);
+termimage::print_rgb(rgb_vector, n_rows, n_cols);
+std::string rendered = termimage::rgb_to_string(rgb_vector, n_rows, n_cols);
 ```
 
 ## Highlights
 
 - `termimage::print(data, rows, cols)` for raw pointers or `std::vector` data that can be cast to `double`
+- `termimage::print_rgb(data, rows, cols)` for `uint8_t` RGB images
 - **Header-only**: `#include "termimage.h"`
 - **Minimal requirements**: C++11 compiler and a modern terminal (with full color support)
 - **Color mapping** with support for `gray`, `viridis`, `plasma`, `inferno`, `magma`, `cividis`, `coolwarm`, `gnuplot`, and `turbo`
@@ -18,6 +21,7 @@ termimage::print(data_vector, n_rows, n_cols);
 - **Crop**: render a subregion without copying data
 - **Upscale**: block upscale small matrices for visibility
 - **Row-major & column-major** memory layout support
+- **RGB image support** — interleaved `RGBRGB...` or planar `RRR...GGG...BBB...` `uint8_t` data
 - **NaN & Inf aware** — NaN cells render as transparent gaps and ±Inf clamps to the color range by default; both are color-configurable
 - **Any numeric type** — templated over `int`, `float`, `double`, etc.
 
@@ -25,6 +29,7 @@ termimage::print(data_vector, n_rows, n_cols);
 
 ```cpp
 #include "termimage.h"
+#include <cstdint>
 #include <vector>
 
 double data[] = {0, 1, 2, 3, 4, 5};
@@ -32,6 +37,12 @@ termimage::print(data, 2, 3); // print with 2 rows, 3 cols
 
 std::vector<double> vec = {0, 1, 2, 3, 4, 5};
 termimage::print(vec, 2, 3);
+
+std::vector<std::uint8_t> rgb = {
+    255, 0, 0,   0, 255, 0,
+    0, 0, 255,   255, 255, 255
+};
+termimage::print_rgb(rgb, 2, 2);
 ```
 
 ## Building
@@ -81,6 +92,53 @@ inputs are intentionally simple and work with custom containers; their
 dimensions are trusted. The vector overload validates that
 `data.size() == rows * cols`.
 
+### `termimage::print_rgb`
+
+```cpp
+void print_rgb(const std::uint8_t* data, size_t rows, size_t cols,
+               const Options& opts = Options());
+
+void print_rgb(const std::uint8_t* data, size_t rows, size_t cols,
+               RGBLayout rgb_layout, const Options& opts = Options());
+
+void print_rgb(const std::vector<std::uint8_t>& data, size_t rows, size_t cols,
+               const Options& opts = Options());
+
+void print_rgb(const std::vector<std::uint8_t>& data, size_t rows, size_t cols,
+               RGBLayout rgb_layout, const Options& opts = Options());
+```
+
+Renders a `rows × cols` RGB image from `uint8_t` data. The default
+`RGBLayout::Interleaved` expects `RGBRGB...`; `RGBLayout::Planar` expects all
+red samples first, then green, then blue. Pointer dimensions are trusted. The
+vector overload validates that `data.size() == rows * cols * 3`.
+
+`print_rgb` uses the layout, crop, fit, resampling, block size, title, and
+ostream options. Scalar-only options such as `clim`, `colormap`, and special
+NaN/Inf colors do not apply.
+
+### `termimage::rgb_to_string`
+
+```cpp
+std::string rgb_to_string(const std::uint8_t* data, size_t rows, size_t cols,
+                          const Options& opts = Options());
+
+std::string rgb_to_string(const std::uint8_t* data, size_t rows, size_t cols,
+                          RGBLayout rgb_layout, const Options& opts = Options());
+
+std::string rgb_to_string(const std::vector<std::uint8_t>& data,
+                          size_t rows, size_t cols,
+                          const Options& opts = Options());
+
+std::string rgb_to_string(const std::vector<std::uint8_t>& data,
+                          size_t rows, size_t cols,
+                          RGBLayout rgb_layout,
+                          const Options& opts = Options());
+```
+
+Returns the same ANSI-rendered RGB output as `print_rgb` without writing to the
+configured stream.
+
 ### `termimage::Options`
 
 All setters are chainable and return `Options&`.
@@ -107,6 +165,7 @@ All setters are chainable and return `Options&`.
 
 ```cpp
 enum class Layout   { RowMajor, ColMajor };
+enum class RGBLayout { Interleaved, Planar };
 enum class Resampling { Nearest, Bilinear };
 enum class Colormap {
     Gray, Magma, Viridis, Plasma, Inferno, Cividis, Coolwarm, Gnuplot, Turbo
