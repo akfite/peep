@@ -26,6 +26,16 @@ if(TERMIMAGE_BUILD_EXAMPLES)
     target_link_libraries(demo PRIVATE termimage)
 endif()
 
+# --- Benchmarks --------------------------------------------------------------
+option(TERMIMAGE_BUILD_BENCH "Build performance benchmark" OFF)
+
+if(TERMIMAGE_BUILD_BENCH)
+    add_executable(bench tests/bench.cpp)
+    target_link_libraries(bench PRIVATE termimage)
+    target_compile_features(bench PRIVATE cxx_std_11)
+    target_compile_options(bench PRIVATE -O2)
+endif()
+
 # --- Tests -------------------------------------------------------------------
 option(TERMIMAGE_BUILD_TESTS "Build unit tests" OFF)
 
