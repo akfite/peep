@@ -1,12 +1,3 @@
-// Usage:
-//
-//   #include <termimage/termimage.hpp>
-//
-//   double data[] = {0, 1, 2, 3, 4, 5};
-//   termimage::print(data, 2, 3);
-//   termimage::print(data, 2, 3, termimage::Options().colormap("magma").block_size(3));
-//
-
 #ifndef TERMIMAGE_TERMIMAGE_HPP
 #define TERMIMAGE_TERMIMAGE_HPP
 
