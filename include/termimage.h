@@ -52,7 +52,7 @@ struct Options {
         else colormap_ = Colormap::Gray;
         return *this;
     }
-    Options& block_size(size_t s) { block_size_ = s; return *this; }
+    Options& block_size(size_t s) { block_size_ = (s > 0) ? s : 1; return *this; }
     Options& layout(Layout l) { layout_ = l; return *this; }
     Options& ostream(std::ostream& os) { out_ = &os; return *this; }
 
@@ -145,7 +145,7 @@ void render(const T* data, size_t rows, size_t cols, const Options& opts) {
 
     const unsigned char* cmap = find_colormap(opts.colormap());
     std::ostream& os = opts.ostream();
-    const size_t bs = opts.block_size() > 0 ? opts.block_size() : 1;
+    const size_t bs = opts.block_size();
     const bool col_major = (opts.layout() == Layout::ColMajor);
 
     // Resolve crop window
