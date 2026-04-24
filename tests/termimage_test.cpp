@@ -680,35 +680,74 @@ TEST(Fit, FitsExactlyIsNoop) {
     EXPECT_FALSE(r.resample);
 }
 
-TEST(Fit, ResampleShrinksBothAxes) {
-    // 100 rows × 200 cols, bs=1, terminal 10 rows × 40 cols.
-    // Max pixel cols = 40, max pixel rows = 20. Caps: out_c=40, out_r=20.
+TEST(Fit, ResampleMatchingAspectScalesUniformly) {
+    // Source 100×200 (vc:vr = 2:1), terminal pixel cap 40×20 (also 2:1).
+    // Uniform scale of 1/5 on both axes → out_c=40, out_r=20.
     FitResolution r = resolve_fit(100, 200, 1, Fit::Resample, ts(10, 40));
     EXPECT_EQ(r.out_r, 20u);
     EXPECT_EQ(r.out_c, 40u);
     EXPECT_TRUE(r.resample);
 }
 
-TEST(Fit, ResampleShrinksOnlyWidth) {
-    // Height fits (10 rows × bs=1 → 10 pixels ≤ 2×50=100). Width overruns.
+TEST(Fit, ResamplePreservesAspectWhenOnlyWidthOverruns) {
+    // Source 10×200 (vc:vr = 20:1). Height alone fits (10 ≤ 2*50=100), but
+    // width overruns (200 > 40). Aspect-preserving resample shrinks BOTH
+    // axes by the width scale factor (40/200 = 1/5) → out_c=40, out_r=2.
+    // Without the aspect fix, the old behavior would leave out_r=10 and
+    // stretch the image vertically by 5x.
     FitResolution r = resolve_fit(10, 200, 1, Fit::Resample, ts(50, 40));
-    EXPECT_EQ(r.out_r, 10u);     // unchanged
-    EXPECT_EQ(r.out_c, 40u);     // capped
+    EXPECT_EQ(r.out_c, 40u);
+    EXPECT_EQ(r.out_r, 2u);
+    EXPECT_EQ(r.out_c / r.out_r, 20u);  // aspect preserved
     EXPECT_TRUE(r.resample);
 }
 
-TEST(Fit, TrimSetsSameDimsButMarksNoResample) {
-    // Trim keeps the same output dims as Resample but uses identity sampling.
+TEST(Fit, ResamplePreservesAspectWhenOnlyHeightOverruns) {
+    // Mirror case: source 200×10 (tall & narrow, vc:vr = 1:20). Width fits
+    // (10 ≤ 40), height overruns (200 > 2*10=20). Height scale = 20/200 = 1/10;
+    // applied to both → out_r=20, out_c=1.
+    FitResolution r = resolve_fit(200, 10, 1, Fit::Resample, ts(10, 40));
+    EXPECT_EQ(r.out_r, 20u);
+    EXPECT_EQ(r.out_c, 1u);
+    EXPECT_EQ(r.out_r / r.out_c, 20u);  // aspect preserved
+    EXPECT_TRUE(r.resample);
+}
+
+TEST(Fit, ResamplePreservesSquareAspect) {
+    // Square source (100×100). Terminal 20 cells × 20 cells → 20 pixel cols,
+    // 40 pixel rows. Width is tighter. Uniform scale → out_c=20, out_r=20.
+    FitResolution r = resolve_fit(100, 100, 1, Fit::Resample, ts(20, 20));
+    EXPECT_EQ(r.out_c, 20u);
+    EXPECT_EQ(r.out_r, 20u);  // square stays square
+    EXPECT_TRUE(r.resample);
+}
+
+TEST(Fit, TrimFillsTerminalWithoutAspectConstraint) {
+    // Trim is identity-sampled (no stretching possible), so it fills the
+    // terminal with whatever top-left region fits — no aspect adjustment.
     FitResolution r = resolve_fit(100, 200, 1, Fit::Trim, ts(10, 40));
     EXPECT_EQ(r.out_r, 20u);
     EXPECT_EQ(r.out_c, 40u);
-    EXPECT_FALSE(r.resample);    // trim → identity sampling, not resample
+    EXPECT_FALSE(r.resample);
+}
+
+TEST(Fit, TrimDoesNotShrinkAxisThatFits) {
+    // Source 10×200 fits vertically as-is; Trim should leave out_r=10 and
+    // only clamp width. Resample with the same inputs would shrink height
+    // for aspect — this test guards the divergence between the two modes.
+    FitResolution r = resolve_fit(10, 200, 1, Fit::Trim, ts(50, 40));
+    EXPECT_EQ(r.out_r, 10u);   // unchanged
+    EXPECT_EQ(r.out_c, 40u);   // capped
+    EXPECT_FALSE(r.resample);
 }
 
 TEST(Fit, BlockSizeScalesCaps) {
     // With bs=4, each output cell takes 4 pixel cols. Terminal 40 cols → 10 cells.
+    // 100×200 source: width-limited scale → out_pcols=40, out_prows=40*100/200=20.
+    // Divided by bs=4: out_c=10, out_r=5 (aspect preserved, was previously 10×50).
     FitResolution r = resolve_fit(100, 200, 4, Fit::Resample, ts(100, 40));
     EXPECT_EQ(r.out_c, 10u);
+    EXPECT_EQ(r.out_r, 5u);
     EXPECT_TRUE(r.resample);
 }
 

@@ -200,11 +200,34 @@ inline FitResolution resolve_fit(size_t vr, size_t vc, size_t bs,
     const size_t prows_needed = vr * bs;
     if (pcols_needed <= max_pcols && prows_needed <= max_prows) return r;
 
-    const size_t cap_c = (max_pcols / bs) ? (max_pcols / bs) : 1;
-    const size_t cap_r = (max_prows / bs) ? (max_prows / bs) : 1;
-    if (cap_c < r.out_c) r.out_c = cap_c;
-    if (cap_r < r.out_r) r.out_r = cap_r;
-    r.resample = (requested == Fit::Resample);
+    if (requested == Fit::Resample) {
+        // Aspect-preserving: pick a single uniform scale factor from the tighter
+        // axis and apply to both, so vc:vr is preserved in pixels (and therefore
+        // on screen, since a half-block pixel is square in a 1:2 terminal cell).
+        //
+        // width-limited ⟺ max_pcols/pcols_needed < max_prows/prows_needed
+        //              ⟺ max_pcols*prows_needed < max_prows*pcols_needed
+        const bool width_limited =
+            max_pcols * prows_needed < max_prows * pcols_needed;
+        size_t out_pcols, out_prows;
+        if (width_limited) {
+            out_pcols = max_pcols;
+            out_prows = (prows_needed * max_pcols) / pcols_needed;
+        } else {
+            out_prows = max_prows;
+            out_pcols = (pcols_needed * max_prows) / prows_needed;
+        }
+        r.out_c = (out_pcols / bs) ? (out_pcols / bs) : 1;
+        r.out_r = (out_prows / bs) ? (out_prows / bs) : 1;
+        r.resample = true;
+    } else { // Fit::Trim
+        // Identity sampling: no stretching possible, so we fill the terminal
+        // with as much of the top-left of the source as fits.
+        const size_t cap_c = (max_pcols / bs) ? (max_pcols / bs) : 1;
+        const size_t cap_r = (max_prows / bs) ? (max_prows / bs) : 1;
+        if (cap_c < r.out_c) r.out_c = cap_c;
+        if (cap_r < r.out_r) r.out_r = cap_r;
+    }
     return r;
 }
 
