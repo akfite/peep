@@ -66,6 +66,13 @@ enum class Fit { Off, Resample, Trim };
 
 namespace detail {
 
+enum class SourceMode {
+    ScalarData,
+    RGBData,
+    ScalarAccessor,
+    RGBAccessor
+};
+
 struct OptionalColor {
     OptionalColor() : value(), set(false) {}
 
@@ -119,18 +126,7 @@ inline std::string str_tolower(const std::string& s) {
     return out;
 }
 
-inline Colormap colormap_from_string(const std::string& name) {
-    std::string lower = str_tolower(name);
-    if (lower == "magma") return Colormap::Magma;
-    if (lower == "viridis") return Colormap::Viridis;
-    if (lower == "plasma") return Colormap::Plasma;
-    if (lower == "inferno") return Colormap::Inferno;
-    if (lower == "cividis") return Colormap::Cividis;
-    if (lower == "coolwarm") return Colormap::Coolwarm;
-    if (lower == "gnuplot") return Colormap::Gnuplot;
-    if (lower == "turbo") return Colormap::Turbo;
-    return Colormap::Gray;
-}
+inline Colormap colormap_from_string(const std::string& name);
 
 } // namespace detail
 
@@ -140,12 +136,15 @@ inline void set_default_colormap(Colormap c) { detail::default_colormap_ref() = 
 
 struct Options {
     Options()
-        : clim_lo_(NAN), clim_hi_(NAN), colormap_(default_colormap()),
+        : clim_lo_(std::numeric_limits<double>::quiet_NaN()),
+        clim_hi_(std::numeric_limits<double>::quiet_NaN()),
+        colormap_(default_colormap()),
         custom_cmap_(), nan_color_(), neg_inf_color_(), pos_inf_color_(),
         block_size_(1), layout_(Layout::RowMajor), out_(&std::cout),
         crop_r0_(0), crop_c0_(0), crop_h_(0), crop_w_(0),
         fit_(Fit::Resample), resampling_(Resampling::Bilinear),
-        rgb_(false), rgb_layout_(RGBLayout::Interleaved),
+        source_mode_(detail::SourceMode::ScalarData),
+        rgb_layout_(RGBLayout::Interleaved),
         scalar_accessor_(), rgb_accessor_(),
         title_() {}
 
@@ -172,10 +171,17 @@ struct Options {
     size_t crop_w() const { return crop_w_; }
     Fit fit() const { return fit_; }
     Resampling resampling() const { return resampling_; }
-    bool is_rgb() const { return rgb_; }
+    bool is_rgb() const {
+        return source_mode_ == detail::SourceMode::RGBData
+            || source_mode_ == detail::SourceMode::RGBAccessor;
+    }
     RGBLayout rgb_layout() const { return rgb_layout_; }
-    bool has_accessor() const { return static_cast<bool>(scalar_accessor_); }
-    bool has_rgb_accessor() const { return static_cast<bool>(rgb_accessor_); }
+    bool has_accessor() const {
+        return source_mode_ == detail::SourceMode::ScalarAccessor;
+    }
+    bool has_rgb_accessor() const {
+        return source_mode_ == detail::SourceMode::RGBAccessor;
+    }
     const ScalarAccessor& accessor() const { return scalar_accessor_; }
     const RGBAccessor& rgb_accessor() const { return rgb_accessor_; }
     bool show_title() const { return title_.show; }
@@ -263,13 +269,13 @@ struct Options {
     Options& fit(Fit f) { fit_ = f; return *this; }
     Options& resampling(Resampling r) { resampling_ = r; return *this; }
     Options& scalar() {
-        rgb_ = false;
+        source_mode_ = detail::SourceMode::ScalarData;
         scalar_accessor_ = ScalarAccessor();
         rgb_accessor_ = RGBAccessor();
         return *this;
     }
     Options& rgb(RGBLayout layout = RGBLayout::Interleaved) {
-        rgb_ = true;
+        source_mode_ = detail::SourceMode::RGBData;
         rgb_layout_ = layout;
         scalar_accessor_ = ScalarAccessor();
         rgb_accessor_ = RGBAccessor();
@@ -277,14 +283,14 @@ struct Options {
     }
     template <typename Accessor>
     Options& accessor(Accessor a) {
-        rgb_ = false;
+        source_mode_ = detail::SourceMode::ScalarAccessor;
         scalar_accessor_ = ScalarAccessor(a);
         rgb_accessor_ = RGBAccessor();
         return *this;
     }
     template <typename Accessor>
     Options& rgb_accessor(Accessor a) {
-        rgb_ = true;
+        source_mode_ = detail::SourceMode::RGBAccessor;
         rgb_accessor_ = RGBAccessor(a);
         scalar_accessor_ = ScalarAccessor();
         return *this;
@@ -316,7 +322,7 @@ private:
     size_t crop_w_;
     Fit fit_;
     Resampling resampling_;
-    bool rgb_;
+    detail::SourceMode source_mode_;
     RGBLayout rgb_layout_;
     ScalarAccessor scalar_accessor_;
     RGBAccessor rgb_accessor_;
@@ -349,56 +355,76 @@ struct Pixel {
 };
 
 // Computed grayscale colormap (avoids embedding trivial data)
-inline const ColormapLut& cmap_gray() {
-    static ColormapLut lut; // 256 * 3
-    static bool init = false;
-    if (!init) {
-        for (int i = 0; i < 256; ++i) {
-            std::uint8_t v = static_cast<std::uint8_t>(i);
-            lut[i * 3 + 0] = v;
-            lut[i * 3 + 1] = v;
-            lut[i * 3 + 2] = v;
-        }
-        init = true;
+inline ColormapLut make_gray_lut() {
+    ColormapLut lut;
+    for (int i = 0; i < 256; ++i) {
+        std::uint8_t v = static_cast<std::uint8_t>(i);
+        lut[i * 3 + 0] = v;
+        lut[i * 3 + 1] = v;
+        lut[i * 3 + 2] = v;
     }
     return lut;
 }
 
-inline const ColormapLut& find_colormap(const std::string& name) {
+inline const ColormapLut& cmap_gray() {
+    static const ColormapLut lut = make_gray_lut();
+    return lut;
+}
+
+struct ColormapEntry {
+    Colormap id;
+    const char* name;
+    const ColormapLut* lut;
+};
+
+inline const ColormapEntry* colormap_entries(size_t& count) {
+    static const ColormapEntry entries[] = {
+        {Colormap::Gray,     "gray",     &cmap_gray()},
+        {Colormap::Magma,    "magma",    &CMAP_MAGMA},
+        {Colormap::Viridis,  "viridis",  &CMAP_VIRIDIS},
+        {Colormap::Plasma,   "plasma",   &CMAP_PLASMA},
+        {Colormap::Inferno,  "inferno",  &CMAP_INFERNO},
+        {Colormap::Cividis,  "cividis",  &CMAP_CIVIDIS},
+        {Colormap::Coolwarm, "coolwarm", &CMAP_COOLWARM},
+        {Colormap::Gnuplot,  "gnuplot",  &CMAP_GNUPLOT},
+        {Colormap::Turbo,    "turbo",    &CMAP_TURBO}
+    };
+    count = sizeof(entries) / sizeof(entries[0]);
+    return entries;
+}
+
+inline Colormap colormap_from_string(const std::string& name) {
     std::string lower = str_tolower(name);
-    if (lower == "gray" || lower == "grey") return cmap_gray();
-    for (int i = 0; i < CMAP_COUNT; ++i) {
-        if (lower == CMAP_NAMES[i]) return *CMAP_DATA[i];
+    if (lower == "grey") lower = "gray";
+
+    size_t count = 0;
+    const ColormapEntry* entries = colormap_entries(count);
+    for (size_t i = 0; i < count; ++i) {
+        if (lower == entries[i].name) return entries[i].id;
+    }
+    return Colormap::Gray;
+}
+
+inline const ColormapLut& find_colormap(Colormap cmap) {
+    size_t count = 0;
+    const ColormapEntry* entries = colormap_entries(count);
+    for (size_t i = 0; i < count; ++i) {
+        if (entries[i].id == cmap) return *entries[i].lut;
     }
     return cmap_gray();
 }
 
-inline const ColormapLut& find_colormap(Colormap cmap) {
-    switch (cmap) {
-        case Colormap::Magma:   return CMAP_MAGMA;
-        case Colormap::Viridis: return CMAP_VIRIDIS;
-        case Colormap::Plasma:  return CMAP_PLASMA;
-        case Colormap::Inferno: return CMAP_INFERNO;
-        case Colormap::Cividis: return CMAP_CIVIDIS;
-        case Colormap::Coolwarm: return CMAP_COOLWARM;
-        case Colormap::Gnuplot: return CMAP_GNUPLOT;
-        case Colormap::Turbo:   return CMAP_TURBO;
-        default:                return cmap_gray();
-    }
+inline const ColormapLut& find_colormap(const std::string& name) {
+    return find_colormap(colormap_from_string(name));
 }
 
 inline const char* colormap_name(Colormap cmap) {
-    switch (cmap) {
-        case Colormap::Magma:    return "magma";
-        case Colormap::Viridis:  return "viridis";
-        case Colormap::Plasma:   return "plasma";
-        case Colormap::Inferno:  return "inferno";
-        case Colormap::Cividis:  return "cividis";
-        case Colormap::Coolwarm: return "coolwarm";
-        case Colormap::Gnuplot:  return "gnuplot";
-        case Colormap::Turbo:    return "turbo";
-        default:                 return "gray";
+    size_t count = 0;
+    const ColormapEntry* entries = colormap_entries(count);
+    for (size_t i = 0; i < count; ++i) {
+        if (entries[i].id == cmap) return entries[i].name;
     }
+    return "gray";
 }
 
 // Resolve the effective colormap from Options (custom takes priority)
@@ -406,6 +432,15 @@ inline const ColormapLut& resolve_colormap(const Options& opts) {
     if (opts.custom_colormap()) return *opts.custom_colormap();
     return find_colormap(opts.colormap());
 }
+
+// Crop and fit planning shared by scalar and RGB renderers.
+struct VisibleRegion {
+    size_t r0;
+    size_t c0;
+    size_t rows;
+    size_t cols;
+    bool empty;
+};
 
 // Given the visible source size (vr, vc), block size, and a terminal size,
 // decide output dimensions (out_r, out_c) and whether resampling is needed.
@@ -415,6 +450,26 @@ struct FitResolution {
     size_t out_c;
     bool resample;
 };
+
+inline VisibleRegion resolve_visible_region(size_t rows, size_t cols,
+                                            const Options& opts) {
+    VisibleRegion r;
+    r.r0 = opts.crop_r0();
+    r.c0 = opts.crop_c0();
+    r.rows = 0;
+    r.cols = 0;
+    r.empty = true;
+
+    if (rows == 0 || cols == 0) return r;
+    if (r.r0 >= rows || r.c0 >= cols) return r;
+
+    r.rows = (opts.crop_h() == 0) ? (rows - r.r0) : opts.crop_h();
+    r.cols = (opts.crop_w() == 0) ? (cols - r.c0) : opts.crop_w();
+    if (r.r0 + r.rows > rows) r.rows = rows - r.r0;
+    if (r.c0 + r.cols > cols) r.cols = cols - r.c0;
+    r.empty = (r.rows == 0 || r.cols == 0);
+    return r;
+}
 
 inline double half_block_pixel_aspect(TerminalSize ts) {
     if (!ts.valid || !ts.pixels_valid
@@ -483,6 +538,35 @@ inline FitResolution resolve_fit(size_t vr, size_t vc, size_t bs,
         if (cap_r < r.out_r) r.out_r = cap_r;
     }
     return r;
+}
+
+struct RenderPlan {
+    VisibleRegion visible;
+    size_t out_r;
+    size_t out_c;
+    bool resample;
+    bool empty;
+};
+
+inline RenderPlan make_render_plan(size_t rows, size_t cols, size_t bs,
+                                   const Options& opts, std::ostream& os) {
+    RenderPlan p;
+    p.visible = resolve_visible_region(rows, cols, opts);
+    p.out_r = 0;
+    p.out_c = 0;
+    p.resample = false;
+    p.empty = p.visible.empty;
+    if (p.empty) return p;
+
+    // Terminal fit only engages when the output is a real terminal;
+    // ostringstream / pipes / files return an invalid size and we fall through
+    // to full-size rendering (Fit::Off semantics).
+    FitResolution fr = resolve_fit(p.visible.rows, p.visible.cols, bs, opts.fit(),
+                                   query_terminal_size(os));
+    p.out_r = fr.out_r;
+    p.out_c = fr.out_c;
+    p.resample = fr.resample;
+    return p;
 }
 
 inline RGB lookup(double normalized, const ColormapLut& cmap) {
@@ -623,11 +707,11 @@ inline std::string sanitize_title_text(const std::string& s) {
     return out;
 }
 
-inline std::string render_title(const Options& opts, size_t rows, size_t cols,
-                                size_t r0, size_t c0, size_t vr, size_t vc,
-                                size_t out_r, size_t out_c,
-                                bool resample) {
-    std::ostringstream ss;
+inline void append_title_summary(std::ostringstream& ss, const Options& opts,
+                                 size_t rows, size_t cols,
+                                 size_t r0, size_t c0, size_t vr, size_t vc,
+                                 size_t out_r, size_t out_c,
+                                 bool resample) {
     const std::string& label = opts.title_text();
     ss << (label.empty() ? "termimage" : sanitize_title_text(label)) << ": ";
     ss << "data=" << rows << 'x' << cols;
@@ -641,6 +725,15 @@ inline std::string render_title(const Options& opts, size_t rows, size_t cols,
         ss << " display=" << out_r << 'x' << out_c;
         ss << (resample ? " resampled" : " trimmed");
     }
+}
+
+inline std::string render_title(const Options& opts, size_t rows, size_t cols,
+                                size_t r0, size_t c0, size_t vr, size_t vc,
+                                size_t out_r, size_t out_c,
+                                bool resample) {
+    std::ostringstream ss;
+    append_title_summary(ss, opts, rows, cols, r0, c0, vr, vc,
+                         out_r, out_c, resample);
 
     ss << " cmap=" << (opts.has_custom_colormap() ? "custom" : colormap_name(opts.colormap()));
     if (opts.layout() == Layout::ColMajor) ss << " layout=col-major";
@@ -658,19 +751,8 @@ inline std::string render_rgb_title(const Options& opts, const char* rgb_source,
                                     size_t out_r, size_t out_c,
                                     bool resample) {
     std::ostringstream ss;
-    const std::string& label = opts.title_text();
-    ss << (label.empty() ? "termimage" : sanitize_title_text(label)) << ": ";
-    ss << "data=" << rows << 'x' << cols;
-
-    const bool cropped = (r0 != 0 || c0 != 0 || vr != rows || vc != cols);
-    if (cropped) {
-        ss << " crop=(" << r0 << ',' << c0 << ' ' << vr << 'x' << vc << ')';
-    }
-
-    if (out_r != vr || out_c != vc) {
-        ss << " display=" << out_r << 'x' << out_c;
-        ss << (resample ? " resampled" : " trimmed");
-    }
+    append_title_summary(ss, opts, rows, cols, r0, c0, vr, vc,
+                         out_r, out_c, resample);
 
     ss << " rgb=" << rgb_source;
     if (opts.layout() == Layout::ColMajor) ss << " layout=col-major";
@@ -823,23 +905,15 @@ void render_scalar_source(size_t rows, size_t cols, GetSource get_source_abs,
     std::ostream& os = opts.ostream();
     const size_t bs = opts.block_size();
 
-    size_t r0 = opts.crop_r0();
-    size_t c0 = opts.crop_c0();
-    if (r0 >= rows || c0 >= cols) return;
-    size_t vr = (opts.crop_h() == 0) ? (rows - r0) : opts.crop_h();
-    size_t vc = (opts.crop_w() == 0) ? (cols - c0) : opts.crop_w();
-    if (r0 + vr > rows) vr = rows - r0;
-    if (c0 + vc > cols) vc = cols - c0;
-    if (vr == 0 || vc == 0) return;
-
-    // Resolve terminal-fit. Only engages when the output is a real terminal;
-    // ostringstream / pipes / files return an invalid size and we fall through
-    // to full-size rendering (Fit::Off semantics).
-    FitResolution fr = resolve_fit(vr, vc, bs, opts.fit(),
-                                   query_terminal_size(os));
-    const size_t out_r = fr.out_r;
-    const size_t out_c = fr.out_c;
-    const bool resample = fr.resample;
+    RenderPlan plan = make_render_plan(rows, cols, bs, opts, os);
+    if (plan.empty) return;
+    const size_t r0 = plan.visible.r0;
+    const size_t c0 = plan.visible.c0;
+    const size_t vr = plan.visible.rows;
+    const size_t vc = plan.visible.cols;
+    const size_t out_r = plan.out_r;
+    const size_t out_c = plan.out_c;
+    const bool resample = plan.resample;
 
     auto get_source = [&](size_t sr, size_t sc) -> double {
         return static_cast<double>(get_source_abs(r0 + sr, c0 + sc));
@@ -909,20 +983,15 @@ void render_rgb_source(size_t rows, size_t cols, GetSource get_source_abs,
     std::ostream& os = opts.ostream();
     const size_t bs = opts.block_size();
 
-    size_t r0 = opts.crop_r0();
-    size_t c0 = opts.crop_c0();
-    if (r0 >= rows || c0 >= cols) return;
-    size_t vr = (opts.crop_h() == 0) ? (rows - r0) : opts.crop_h();
-    size_t vc = (opts.crop_w() == 0) ? (cols - c0) : opts.crop_w();
-    if (r0 + vr > rows) vr = rows - r0;
-    if (c0 + vc > cols) vc = cols - c0;
-    if (vr == 0 || vc == 0) return;
-
-    FitResolution fr = resolve_fit(vr, vc, bs, opts.fit(),
-                                   query_terminal_size(os));
-    const size_t out_r = fr.out_r;
-    const size_t out_c = fr.out_c;
-    const bool resample = fr.resample;
+    RenderPlan plan = make_render_plan(rows, cols, bs, opts, os);
+    if (plan.empty) return;
+    const size_t r0 = plan.visible.r0;
+    const size_t c0 = plan.visible.c0;
+    const size_t vr = plan.visible.rows;
+    const size_t vc = plan.visible.cols;
+    const size_t out_r = plan.out_r;
+    const size_t out_c = plan.out_c;
+    const bool resample = plan.resample;
 
     auto get_source = [&](size_t sr, size_t sc) -> RGB {
         return get_source_abs(r0 + sr, c0 + sc);

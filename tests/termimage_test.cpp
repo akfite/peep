@@ -1084,8 +1084,8 @@ TEST(Clim, AutoClimScansWholeVisibleSourceRegion) {
         0.0, 100.0, 1.0,
         2.0, 3.0, 4.0
     };
-    double lo = NAN;
-    double hi = NAN;
+    double lo = std::numeric_limits<double>::quiet_NaN();
+    double hi = std::numeric_limits<double>::quiet_NaN();
 
     apply_auto_clim(2, 3,
         [&](size_t r, size_t c) { return values[r * 3 + c]; },

@@ -59,7 +59,7 @@ This builds the demo (but not unit tests) by default. To configure:
 
 ```bash
 cmake -S . -B build -DTERMIMAGE_BUILD_EXAMPLES=OFF
-cmake -S . -B build -DTERMIMAGE_BUILD_TESTS=OFF
+cmake -S . -B build -DTERMIMAGE_BUILD_TESTS=ON
 ```
 
 ### Running the Demo
@@ -73,6 +73,8 @@ cmake -S . -B build -DTERMIMAGE_BUILD_TESTS=OFF
 Tests use [GoogleTest](https://github.com/google/googletest) (fetched automatically via CMake `FetchContent`):
 
 ```bash
+cmake -S . -B build -DTERMIMAGE_BUILD_TESTS=ON
+cmake --build build
 ctest --test-dir build
 ```
 

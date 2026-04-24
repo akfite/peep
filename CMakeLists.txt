@@ -33,11 +33,15 @@ if(TERMIMAGE_BUILD_BENCH)
     add_executable(bench tests/bench.cpp)
     target_link_libraries(bench PRIVATE termimage)
     target_compile_features(bench PRIVATE cxx_std_11)
-    target_compile_options(bench PRIVATE -O2)
+    if(MSVC)
+        target_compile_options(bench PRIVATE /O2)
+    else()
+        target_compile_options(bench PRIVATE -O2)
+    endif()
 endif()
 
 # --- Tests -------------------------------------------------------------------
-option(TERMIMAGE_BUILD_TESTS "Build unit tests" ON)
+option(TERMIMAGE_BUILD_TESTS "Build unit tests" OFF)
 
 if(TERMIMAGE_BUILD_TESTS)
     include(CTest)

@@ -424,30 +424,6 @@ static const std::array<std::uint8_t, 768> CMAP_TURBO = {{
     0x02, 0x88, 0x08, 0x02, 0x85, 0x07, 0x02, 0x81, 0x06, 0x02, 0x7e, 0x05, 0x02, 0x7a, 0x04, 0x03,
 }};
 
-static const int CMAP_COUNT = 8;
-
-static const char* const CMAP_NAMES[] = {
-    "viridis",
-    "plasma",
-    "inferno",
-    "magma",
-    "cividis",
-    "coolwarm",
-    "gnuplot",
-    "turbo",
-};
-
-static const std::array<std::uint8_t, 768>* const CMAP_DATA[] = {
-    &CMAP_VIRIDIS,
-    &CMAP_PLASMA,
-    &CMAP_INFERNO,
-    &CMAP_MAGMA,
-    &CMAP_CIVIDIS,
-    &CMAP_COOLWARM,
-    &CMAP_GNUPLOT,
-    &CMAP_TURBO,
-};
-
 } // namespace detail
 } // namespace termimage
 

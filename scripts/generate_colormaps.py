@@ -32,6 +32,7 @@ def load_colormap_bytes(name):
             data.append(max(0, min(255, int(round(channel * 255.0)))))
     return data
 
+
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     repo_root = os.path.dirname(script_dir)
@@ -48,9 +49,7 @@ def main():
         out.write("namespace termimage {\n")
         out.write("namespace detail {\n\n")
 
-        names = []
         for name in COLORMAPS:
-            names.append(name)
             var_name = f"CMAP_{name.upper()}"
             data = load_colormap_bytes(name)
 
@@ -69,26 +68,15 @@ def main():
 
             out.write("\n}};\n\n")
 
-        # Write count constant
-        out.write(f"static const int CMAP_COUNT = {len(names)};\n\n")
-
-        # Write name array
-        out.write("static const char* const CMAP_NAMES[] = {\n")
-        for name in names:
-            out.write(f'    "{name}",\n')
-        out.write("};\n\n")
-
-        # Write data pointer array (same order as CMAP_NAMES)
-        out.write("static const std::array<std::uint8_t, 768>* const CMAP_DATA[] = {\n")
-        for name in names:
-            out.write(f"    &CMAP_{name.upper()},\n")
-        out.write("};\n\n")
-
         out.write("} // namespace detail\n")
         out.write("} // namespace termimage\n\n")
         out.write("#endif // TERMIMAGE_COLORMAPS_H\n")
 
-    print(f"Generated {output_file} with {len(names)} colormaps: {', '.join(names)}")
+    print(
+        f"Generated {output_file} with {len(COLORMAPS)} colormaps: "
+        f"{', '.join(COLORMAPS)}"
+    )
+
 
 if __name__ == "__main__":
     main()
