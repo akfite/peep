@@ -21,6 +21,7 @@ std::string rendered = termimage::to_string(rgb_vector, n_rows, n_cols,
 - **Color mapping** with support for `gray`, `viridis`, `plasma`, `inferno`, `magma`, `cividis`, `coolwarm`, `gnuplot`, and `turbo`
 - **Automatic or manual scaling**: computes `clim` from data, or you can set it yourself
 - **Default colorbar** for scalar images to show the displayed color scale
+- **Automatic block sizing** makes tiny terminal images easier to inspect
 - **Terminal auto-fit**: oversized images are resampled (or trimmed) to fit the window
 - **Crop**: render a subregion without copying data
 - **Upscale**: block upscale small matrices for visibility
@@ -162,7 +163,7 @@ All setters are chainable and return `Options&`.
 | `.colormap(vector<uint8_t>)` | `.custom_colormap()` | Set a custom LUT from a vector with exactly 768 bytes. |
 | `.nan_color(Color)` | `.nan_color()` / `.has_nan_color()` | Render NaN values with a fixed RGB color instead of transparent gaps. |
 | `.inf_color(Color)` / `.inf_colors(neg, pos)` | `.neg_inf_color()` / `.pos_inf_color()` | Render infinities with fixed RGB colors instead of colormap endpoints. |
-| `.block_size(n)` | `.block_size()` | Pixel scale factor per matrix element. Default: `1`. |
+| `.block_size(n)` | `.block_size()` / `.has_block_size()` | Pixel scale factor per matrix element. If unset, small images printed to a terminal are automatically enlarged when doing so still fits without resampling or trimming. |
 | `.layout(Layout)` | `.layout()` | `Layout::RowMajor` (default) or `Layout::ColMajor`. |
 | `.scalar()` | `.is_rgb()` | Select scalar pointer/vector data mode. Default. |
 | `.rgb(RGBLayout)` | `.is_rgb()` / `.rgb_layout()` | Select RGB pointer/vector data mode for `uint8_t` input. Default layout: `RGBLayout::Interleaved`. |
@@ -206,6 +207,11 @@ When the terminal reports both cell and pixel dimensions, `Fit::Resample`
 also compensates for terminals whose half-block pixels are not physically
 square. Terminals that do not expose pixel dimensions use the standard `1:2`
 cell assumption.
+
+When `.block_size()` has not been set explicitly, small images printed to a
+real terminal are automatically enlarged up to a modest block size. The
+automatic choice is capped by the terminal dimensions, so it will not be the
+reason an image gets resampled or trimmed. Use `.block_size(1)` to opt out.
 
 ## Requirements
 

@@ -27,6 +27,7 @@ TEST(Options, DefaultValues) {
     EXPECT_FALSE(opts.has_neg_inf_color());
     EXPECT_FALSE(opts.has_pos_inf_color());
     EXPECT_EQ(opts.block_size(), 1);
+    EXPECT_FALSE(opts.has_block_size());
     EXPECT_EQ(opts.layout(), Layout::RowMajor);
     EXPECT_EQ(&opts.ostream(), &std::cout);
     EXPECT_EQ(opts.crop_r0(), 0);
@@ -65,6 +66,7 @@ TEST(Options, ChainableSetters) {
     EXPECT_DOUBLE_EQ(opts.clim_hi(), 2.0);
     EXPECT_EQ(opts.colormap(), Colormap::Magma);
     EXPECT_EQ(opts.block_size(), 3);
+    EXPECT_TRUE(opts.has_block_size());
     EXPECT_EQ(opts.layout(), Layout::ColMajor);
     EXPECT_EQ(&opts.ostream(), &oss);
     EXPECT_EQ(opts.crop_r0(), 4u);
@@ -1081,6 +1083,53 @@ TEST(Fit, BlockSizeLargerThanTerminalClampsToOne) {
     FitResolution r = resolve_fit(100, 200, 100, Fit::Resample, ts(100, 40));
     EXPECT_EQ(r.out_c, 1u);
     EXPECT_TRUE(r.resample);
+}
+
+TEST(Fit, AutoBlockSizeInvalidTerminalIsNoop) {
+    Options opts;
+    EXPECT_EQ(resolve_effective_block_size(8, 8, opts, ts(0, 0, false)), 1u);
+}
+
+TEST(Fit, AutoBlockSizeRespectsExplicitBlockSize) {
+    Options opts;
+    opts.block_size(1);
+    EXPECT_EQ(resolve_effective_block_size(8, 8, opts, ts(24, 80)), 1u);
+
+    opts.block_size(3);
+    EXPECT_EQ(resolve_effective_block_size(8, 8, opts, ts(24, 80)), 3u);
+}
+
+TEST(Fit, AutoBlockSizeUpscalesSmallImage) {
+    Options opts;
+    EXPECT_EQ(resolve_effective_block_size(8, 8, opts, ts(24, 80)), 4u);
+}
+
+TEST(Fit, AutoBlockSizeNeverExceedsDisplay) {
+    Options opts;
+    size_t bs = resolve_effective_block_size(5, 7, opts, ts(6, 20));
+
+    EXPECT_GT(bs, 1u);
+    EXPECT_LE(7u * bs, 20u);
+    // One terminal row is reserved for the default scalar colorbar.
+    EXPECT_LE(5u * bs, (6u - 1u) * 2u);
+
+    FitResolution r = resolve_fit(5, 7, bs, Fit::Resample, ts(6, 20));
+    EXPECT_EQ(r.out_r, 5u);
+    EXPECT_EQ(r.out_c, 7u);
+    EXPECT_FALSE(r.resample);
+}
+
+TEST(Fit, AutoBlockSizeLeavesAlreadyTooLargeImageAtOne) {
+    Options opts;
+    EXPECT_EQ(resolve_effective_block_size(100, 100, opts, ts(10, 40)), 1u);
+}
+
+TEST(Fit, AutoBlockSizeDoesNotEngageWhenBaseWouldResample) {
+    // Half-block pixels are not square here, so Fit::Resample would adjust
+    // output rows even at block_size=1. Auto block sizing should stay out of it.
+    Options opts;
+    EXPECT_EQ(resolve_effective_block_size(10, 10, opts,
+        ts(50, 50, true, 500, 1100)), 1u);
 }
 
 TEST(Clim, AutoClimScansWholeVisibleSourceRegion) {

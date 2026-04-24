@@ -43,7 +43,7 @@ int main() {
     std::cout << std::endl;
 
     // 2. RGB uint8 image. 2x4 color chart makes channel/order mistakes obvious.
-    std::cout << "=== RGB uint8 color chart (interleaved, block_size=2) ===" << std::endl;
+    std::cout << "=== RGB uint8 color chart (interleaved, auto block size) ===" << std::endl;
     {
         const int rows = 16;
         const int cols = 32;
@@ -79,14 +79,13 @@ int main() {
         termimage::print(rgb, rows, cols,
             termimage::Options()
                 .rgb()
-                .block_size(2)
                 .resampling(termimage::Resampling::Nearest)
                 .title("rgb chart"));
     }
     std::cout << std::endl;
 
-    // 3. Square 2D Gaussian scaled by pi (magma, block_size=2)
-    std::cout << "=== 2D Gaussian x pi (magma, block_size=2) ===" << std::endl;
+    // 3. Square 2D Gaussian scaled by pi (magma, auto block size)
+    std::cout << "=== 2D Gaussian x pi (magma, auto block size) ===" << std::endl;
     {
         const int n = 25;
         const double pi = 3.14159265358979323846;
@@ -100,7 +99,7 @@ int main() {
                           + (r - center) * (r - center))
                     / (sigma * sigma));
         termimage::print(gauss, n, n,
-            termimage::Options().colormap("magma").block_size(2));
+            termimage::Options().colormap("magma"));
     }
     std::cout << std::endl;
 
@@ -123,18 +122,18 @@ int main() {
     std::cout << std::endl;
 
     // 5. 8x8 integer ramp, cropped to a 4x6 window starting at (2,1)
-    std::cout << "=== 8x8 integers, cropped to (2,1) 4x6 (gray, block_size=3) ===" << std::endl;
+    std::cout << "=== 8x8 integers, cropped to (2,1) 4x6 (gray, auto block size) ===" << std::endl;
     {
         int mat[64];
         for (int i = 0; i < 64; ++i)
             mat[i] = i;
         termimage::print(mat, 8, 8,
-            termimage::Options().crop(2, 1, 4, 6).block_size(3));
+            termimage::Options().crop(2, 1, 4, 6));
     }
     std::cout << std::endl;
 
     // 6. Inf handling with explicit clim
-    std::cout << "=== Inf handling (magma, block_size=3) ===" << std::endl;
+    std::cout << "=== Inf handling (magma, auto block size) ===" << std::endl;
     {
         double inf = std::numeric_limits<double>::infinity();
         double data[] = {
@@ -142,7 +141,7 @@ int main() {
             0.75, 1.0, inf, 0.5
         };
         termimage::print(data, 2, 4,
-            termimage::Options().colormap("magma").clim(0.0, 1.0).block_size(3));
+            termimage::Options().colormap("magma").clim(0.0, 1.0));
     }
     std::cout << std::endl;
 

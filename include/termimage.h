@@ -114,6 +114,18 @@ struct TitleOptions {
     std::string text;
 };
 
+struct BlockSizeOption {
+    BlockSizeOption() : value(1), set(false) {}
+
+    void assign(size_t s) {
+        value = (s > 0) ? s : 1;
+        set = true;
+    }
+
+    size_t value;
+    bool set;
+};
+
 inline Colormap& default_colormap_ref() {
     static Colormap cmap = Colormap::Gray;
     return cmap;
@@ -140,7 +152,7 @@ struct Options {
         clim_hi_(std::numeric_limits<double>::quiet_NaN()),
         colormap_(default_colormap()),
         custom_cmap_(), nan_color_(), neg_inf_color_(), pos_inf_color_(),
-        block_size_(1), layout_(Layout::RowMajor), out_(&std::cout),
+        block_size_(), layout_(Layout::RowMajor), out_(&std::cout),
         crop_r0_(0), crop_c0_(0), crop_h_(0), crop_w_(0),
         fit_(Fit::Resample), resampling_(Resampling::Bilinear),
         source_mode_(detail::SourceMode::ScalarData),
@@ -162,7 +174,8 @@ struct Options {
     bool has_neg_inf_color() const { return neg_inf_color_.set; }
     Color pos_inf_color() const { return pos_inf_color_.value; }
     bool has_pos_inf_color() const { return pos_inf_color_.set; }
-    size_t block_size() const { return block_size_; }
+    size_t block_size() const { return block_size_.value; }
+    bool has_block_size() const { return block_size_.set; }
     Layout layout() const { return layout_; }
     std::ostream& ostream() const { return *out_; }
     size_t crop_r0() const { return crop_r0_; }
@@ -251,7 +264,7 @@ struct Options {
         pos_inf_color_.clear();
         return *this;
     }
-    Options& block_size(size_t s) { block_size_ = (s > 0) ? s : 1; return *this; }
+    Options& block_size(size_t s) { block_size_.assign(s); return *this; }
     Options& layout(Layout l) { layout_ = l; return *this; }
     Options& ostream(std::ostream& os) { out_ = &os; return *this; }
 
@@ -318,7 +331,7 @@ private:
     detail::OptionalColor nan_color_;
     detail::OptionalColor neg_inf_color_;
     detail::OptionalColor pos_inf_color_;
-    size_t block_size_;
+    detail::BlockSizeOption block_size_;
     Layout layout_;
     std::ostream* out_;
     size_t crop_r0_;
@@ -497,6 +510,10 @@ inline size_t rounded_size(double v) {
     return (v > 1.0) ? static_cast<size_t>(v + 0.5) : 1;
 }
 
+inline size_t ceil_div(size_t n, size_t d) {
+    return (d == 0) ? 1 : (n + d - 1) / d;
+}
+
 inline FitResolution resolve_fit(size_t vr, size_t vc, size_t bs,
                                  Fit requested, TerminalSize ts) {
     FitResolution r;
@@ -546,20 +563,71 @@ inline FitResolution resolve_fit(size_t vr, size_t vc, size_t bs,
     return r;
 }
 
+inline size_t terminal_rows_reserved_for_chrome(const Options& opts) {
+    size_t rows = 0;
+    if (opts.show_title()) ++rows;
+    if (!opts.is_rgb() && opts.show_colorbar()) ++rows;
+    return rows;
+}
+
+inline size_t resolve_effective_block_size(size_t vr, size_t vc,
+                                           const Options& opts,
+                                           TerminalSize ts) {
+    const size_t requested = opts.block_size();
+    if (opts.has_block_size() || !ts.valid || vr == 0 || vc == 0) {
+        return requested;
+    }
+
+    // If the unscaled image would already be resampled/trimmed, do not make
+    // that worse by enlarging it. This also leaves terminal pixel-aspect
+    // correction alone when Fit::Resample chooses to adjust output rows.
+    const FitResolution base_fit = resolve_fit(vr, vc, requested, opts.fit(), ts);
+    if (base_fit.out_r != vr || base_fit.out_c != vc || base_fit.resample) {
+        return requested;
+    }
+
+    const size_t reserved_rows = terminal_rows_reserved_for_chrome(opts);
+    if (ts.rows <= reserved_rows || ts.cols == 0) return requested;
+
+    const size_t max_pcols = ts.cols;
+    const size_t max_prows = (ts.rows - reserved_rows) * 2;
+    if (vc > max_pcols || vr > max_prows) return requested;
+
+    const size_t max_by_cols = max_pcols / vc;
+    const size_t max_by_rows = max_prows / vr;
+    size_t max_bs = std::min(max_by_cols, max_by_rows);
+    if (max_bs <= requested) return requested;
+
+    const size_t kTargetPixelCols = 48;
+    const size_t kTargetPixelRows = 32;
+    const size_t kMaxAutoBlockSize = 8;
+
+    const size_t target_pcols = std::min(max_pcols, kTargetPixelCols);
+    const size_t target_prows = std::min(max_prows, kTargetPixelRows);
+    size_t auto_bs = std::min(ceil_div(target_pcols, vc),
+                              ceil_div(target_prows, vr));
+    if (auto_bs < requested) auto_bs = requested;
+    if (auto_bs > max_bs) auto_bs = max_bs;
+    if (auto_bs > kMaxAutoBlockSize) auto_bs = kMaxAutoBlockSize;
+    return auto_bs;
+}
+
 struct RenderPlan {
     VisibleRegion visible;
     size_t out_r;
     size_t out_c;
+    size_t block_size;
     bool resample;
     bool empty;
 };
 
-inline RenderPlan make_render_plan(size_t rows, size_t cols, size_t bs,
+inline RenderPlan make_render_plan(size_t rows, size_t cols,
                                    const Options& opts, std::ostream& os) {
     RenderPlan p;
     p.visible = resolve_visible_region(rows, cols, opts);
     p.out_r = 0;
     p.out_c = 0;
+    p.block_size = opts.block_size();
     p.resample = false;
     p.empty = p.visible.empty;
     if (p.empty) return p;
@@ -567,8 +635,11 @@ inline RenderPlan make_render_plan(size_t rows, size_t cols, size_t bs,
     // Terminal fit only engages when the output is a real terminal;
     // ostringstream / pipes / files return an invalid size and we fall through
     // to full-size rendering (Fit::Off semantics).
-    FitResolution fr = resolve_fit(p.visible.rows, p.visible.cols, bs, opts.fit(),
-                                   query_terminal_size(os));
+    TerminalSize ts = query_terminal_size(os);
+    p.block_size = resolve_effective_block_size(p.visible.rows, p.visible.cols,
+                                                opts, ts);
+    FitResolution fr = resolve_fit(p.visible.rows, p.visible.cols, p.block_size,
+                                   opts.fit(), ts);
     p.out_r = fr.out_r;
     p.out_c = fr.out_c;
     p.resample = fr.resample;
@@ -768,14 +839,15 @@ inline void append_title_summary(std::ostringstream& ss, const Options& opts,
 inline std::string render_title(const Options& opts, size_t rows, size_t cols,
                                 size_t r0, size_t c0, size_t vr, size_t vc,
                                 size_t out_r, size_t out_c,
-                                bool resample) {
+                                bool resample, size_t block_size = 0) {
     std::ostringstream ss;
     append_title_summary(ss, opts, rows, cols, r0, c0, vr, vc,
                          out_r, out_c, resample);
 
+    if (block_size == 0) block_size = opts.block_size();
     ss << " cmap=" << (opts.has_custom_colormap() ? "custom" : colormap_name(opts.colormap()));
     if (opts.layout() == Layout::ColMajor) ss << " layout=col-major";
-    if (opts.block_size() != 1) ss << " block=" << opts.block_size();
+    if (block_size != 1) ss << " block=" << block_size;
     return ss.str();
 }
 
@@ -787,14 +859,15 @@ inline std::string render_rgb_title(const Options& opts, const char* rgb_source,
                                     size_t rows, size_t cols,
                                     size_t r0, size_t c0, size_t vr, size_t vc,
                                     size_t out_r, size_t out_c,
-                                    bool resample) {
+                                    bool resample, size_t block_size = 0) {
     std::ostringstream ss;
     append_title_summary(ss, opts, rows, cols, r0, c0, vr, vc,
                          out_r, out_c, resample);
 
+    if (block_size == 0) block_size = opts.block_size();
     ss << " rgb=" << rgb_source;
     if (opts.layout() == Layout::ColMajor) ss << " layout=col-major";
-    if (opts.block_size() != 1) ss << " block=" << opts.block_size();
+    if (block_size != 1) ss << " block=" << block_size;
     return ss.str();
 }
 
@@ -941,10 +1014,10 @@ void render_scalar_source(size_t rows, size_t cols, GetSource get_source_abs,
 
     const ColormapLut& cmap = resolve_colormap(opts);
     std::ostream& os = opts.ostream();
-    const size_t bs = opts.block_size();
 
-    RenderPlan plan = make_render_plan(rows, cols, bs, opts, os);
+    RenderPlan plan = make_render_plan(rows, cols, opts, os);
     if (plan.empty) return;
+    const size_t bs = plan.block_size;
     const size_t r0 = plan.visible.r0;
     const size_t c0 = plan.visible.c0;
     const size_t vr = plan.visible.rows;
@@ -984,7 +1057,8 @@ void render_scalar_source(size_t rows, size_t cols, GetSource get_source_abs,
     // Buffer all output, then flush once
     std::ostringstream buf;
     if (opts.show_title()) {
-        buf << render_title(opts, rows, cols, r0, c0, vr, vc, out_r, out_c, resample)
+        buf << render_title(opts, rows, cols, r0, c0, vr, vc,
+                            out_r, out_c, resample, bs)
             << '\n';
     }
 
@@ -1022,10 +1096,10 @@ void render_rgb_source(size_t rows, size_t cols, GetSource get_source_abs,
     if (rows == 0 || cols == 0) return;
 
     std::ostream& os = opts.ostream();
-    const size_t bs = opts.block_size();
 
-    RenderPlan plan = make_render_plan(rows, cols, bs, opts, os);
+    RenderPlan plan = make_render_plan(rows, cols, opts, os);
     if (plan.empty) return;
+    const size_t bs = plan.block_size;
     const size_t r0 = plan.visible.r0;
     const size_t c0 = plan.visible.c0;
     const size_t vr = plan.visible.rows;
@@ -1047,7 +1121,7 @@ void render_rgb_source(size_t rows, size_t cols, GetSource get_source_abs,
     std::ostringstream buf;
     if (opts.show_title()) {
         buf << render_rgb_title(opts, rgb_source, rows, cols,
-                                r0, c0, vr, vc, out_r, out_c, resample)
+                                r0, c0, vr, vc, out_r, out_c, resample, bs)
             << '\n';
     }
 
