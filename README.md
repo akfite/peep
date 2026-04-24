@@ -13,6 +13,7 @@ termimage::print(data_ptr, n_rows, n_cols);
 - **Minimal requirements**: C++11 compiler and a modern terminal (with full color support)
 - **Color mapping** with support for `gray`, `magma`, `viridis` (from [matplotlib](https://github.com/matplotlib/matplotlib))
 - **Automatic or manual scaling**: computes `clim` from data, or you can set it yourself
+- **Terminal auto-fit**: oversized images are resampled (or trimmed) to fit the window
 - **Crop**: render a subregion without copying data
 - **Upscale**: block upscale small matrices for visibility
 - **Row-major & column-major** memory layout support
@@ -82,13 +83,24 @@ All setters are chainable and return `Options&`.
 | `.ostream(os)` | `.ostream()` | Output stream. Default: `std::cout`. |
 | `.crop(r0, c0)` | `.crop_r0()` / `.crop_c0()` | Crop from `(r0, c0)` to end of matrix. |
 | `.crop(r0, c0, h, w)` | `.crop_h()` / `.crop_w()` | Crop a `h × w` subregion starting at `(r0, c0)`. |
+| `.fit(Fit)` | `.fit()` | Behavior when the image exceeds the terminal. Default: `Fit::Resample`. |
 
 ### Enums
 
 ```cpp
 enum class Layout   { RowMajor, ColMajor };
 enum class Colormap { Gray, Magma, Viridis };
+enum class Fit      { Off, Resample, Trim };
 ```
+
+`Fit::Resample` (default) nearest-neighbor downsamples oversized images to fit.
+`Fit::Trim` renders the top-left portion that fits and discards the rest.
+`Fit::Off` always renders at full size, letting the terminal wrap or scroll.
+
+Fit only engages when the output stream is a real terminal (stdout/stderr +
+`isatty`). When rendering to an `ostringstream`, file, or pipe, fit behaves as
+`Off`, so `to_string()` and redirected output are byte-identical regardless of
+mode.
 
 ## Requirements
 

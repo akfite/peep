@@ -78,10 +78,12 @@ int main() {
     }
     std::cout << std::endl;
 
-    // 6. MATLAB peaks — classic scientific visualization surface
-    std::cout << "=== MATLAB peaks (viridis) ===" << std::endl;
+    // 6. MATLAB peaks — oversized to demonstrate terminal auto-fit (resample).
+    //    The source grid is much larger than any terminal; Fit::Resample
+    //    (the default) nearest-neighbor downsamples it to fit the window.
+    std::cout << "=== MATLAB peaks (viridis, 1000x1000 resampled to fit) ===" << std::endl;
     {
-        const int n = 49;
+        const int n = 1000;
         std::vector<double> peaks(n * n);
         for (int r = 0; r < n; ++r) {
             double y = -3.0 + 6.0 * r / (n - 1);

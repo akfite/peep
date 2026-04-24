@@ -20,11 +20,20 @@
 #include <string>
 
 #include "termimage_colormaps.h"
+#include "termimage_terminal.h"
 
 namespace termimage {
 
 enum class Layout { RowMajor, ColMajor };
 enum class Colormap { Gray, Magma, Viridis };
+
+// What to do when the rendered image would exceed the terminal window.
+//   Off      — render at full size (may wrap or scroll).
+//   Resample — nearest-neighbor downsample to fit the terminal.
+//   Trim     — render the top-left portion that fits, discard the rest.
+// Only engages when the output stream is a terminal (stdout/stderr + isatty).
+// Otherwise behaves as Off, so to_string and piped output are unaffected.
+enum class Fit { Off, Resample, Trim };
 
 namespace detail {
 
@@ -51,7 +60,8 @@ struct Options {
         : clim_lo_(NAN), clim_hi_(NAN), colormap_(default_colormap()),
         custom_cmap_(nullptr),
         block_size_(1), layout_(Layout::RowMajor), out_(&std::cout),
-        crop_r0_(0), crop_c0_(0), crop_h_(0), crop_w_(0) {}
+        crop_r0_(0), crop_c0_(0), crop_h_(0), crop_w_(0),
+        fit_(Fit::Resample) {}
 
     // Getters
     double clim_lo() const { return clim_lo_; }
@@ -65,6 +75,7 @@ struct Options {
     size_t crop_c0() const { return crop_c0_; }
     size_t crop_h() const { return crop_h_; }
     size_t crop_w() const { return crop_w_; }
+    Fit fit() const { return fit_; }
 
     // Chainable setters
     Options& clim(double lo, double hi) { clim_lo_ = lo; clim_hi_ = hi; return *this; }
@@ -97,6 +108,7 @@ struct Options {
         crop_h_ = h; crop_w_ = w;
         return *this;
     }
+    Options& fit(Fit f) { fit_ = f; return *this; }
 
 private:
     double clim_lo_;
@@ -110,6 +122,7 @@ private:
     size_t crop_c0_;
     size_t crop_h_;
     size_t crop_w_;
+    Fit fit_;
 };
 
 // public API
@@ -164,6 +177,37 @@ inline const unsigned char* resolve_colormap(const Options& opts) {
     return find_colormap(opts.colormap());
 }
 
+// Given the visible source size (vr, vc), block size, and a terminal size,
+// decide output dimensions (out_r, out_c) and whether resampling is needed.
+// Pure function of its inputs — the terminal query happens at the call site.
+struct FitResolution {
+    size_t out_r;
+    size_t out_c;
+    bool resample;
+};
+
+inline FitResolution resolve_fit(size_t vr, size_t vc, size_t bs,
+                                 Fit requested, TerminalSize ts) {
+    FitResolution r;
+    r.out_r = vr;
+    r.out_c = vc;
+    r.resample = false;
+    if (requested == Fit::Off || !ts.valid) return r;
+
+    const size_t max_pcols = ts.cols;
+    const size_t max_prows = ts.rows * 2; // 2 pixel rows per half-block cell
+    const size_t pcols_needed = vc * bs;
+    const size_t prows_needed = vr * bs;
+    if (pcols_needed <= max_pcols && prows_needed <= max_prows) return r;
+
+    const size_t cap_c = (max_pcols / bs) ? (max_pcols / bs) : 1;
+    const size_t cap_r = (max_prows / bs) ? (max_prows / bs) : 1;
+    if (cap_c < r.out_c) r.out_c = cap_c;
+    if (cap_r < r.out_r) r.out_r = cap_r;
+    r.resample = (requested == Fit::Resample);
+    return r;
+}
+
 inline RGB lookup(double normalized, const unsigned char* cmap) {
     int idx = static_cast<int>(normalized * 255.0 + 0.5);
     if (idx < 0) idx = 0;
@@ -216,12 +260,25 @@ void render(const T* data, size_t rows, size_t cols, const Options& opts) {
     if (c0 + vc > cols) vc = cols - c0;
     if (vr == 0 || vc == 0) return;
 
-    // Element accessor (matrix coords relative to crop origin)
+    // Resolve terminal-fit. Only engages when the output is a real terminal;
+    // ostringstream / pipes / files return an invalid size and we fall through
+    // to full-size rendering (Fit::Off semantics).
+    FitResolution fr = resolve_fit(vr, vc, bs, opts.fit(),
+                                   query_terminal_size(os));
+    const size_t out_r = fr.out_r;
+    const size_t out_c = fr.out_c;
+    const bool resample = fr.resample;
+
+    // Element accessor (output-matrix coords, maps to source via resample or identity).
+    // Bresenham-style index scaling: when out == v, (mr*vr)/out_r == mr (identity), so
+    // resample=true with no shrink is a no-op. trim uses identity sampling directly.
     auto get = [&](size_t mr, size_t mc) -> double {
+        size_t sr = resample ? (mr * vr) / out_r : mr;
+        size_t sc = resample ? (mc * vc) / out_c : mc;
         if (col_major)
-            return static_cast<double>(data[(c0 + mc) * rows + (r0 + mr)]);
+            return static_cast<double>(data[(c0 + sc) * rows + (r0 + sr)]);
         else
-            return static_cast<double>(data[(r0 + mr) * cols + (c0 + mc)]);
+            return static_cast<double>(data[(r0 + sr) * cols + (c0 + sc)]);
     };
 
     // Compute clim from visible region only
@@ -233,8 +290,8 @@ void render(const T* data, size_t rows, size_t cols, const Options& opts) {
     if (auto_lo || auto_hi) {
         double flo = std::numeric_limits<double>::infinity();
         double fhi = -std::numeric_limits<double>::infinity();
-        for (size_t mr = 0; mr < vr; ++mr) {
-            for (size_t mc = 0; mc < vc; ++mc) {
+        for (size_t mr = 0; mr < out_r; ++mr) {
+            for (size_t mc = 0; mc < out_c; ++mc) {
                 double v = get(mr, mc);
                 if (std::isnan(v) || std::isinf(v)) continue;
                 if (v < flo) flo = v;
@@ -256,9 +313,9 @@ void render(const T* data, size_t rows, size_t cols, const Options& opts) {
         return n;
     };
 
-    // Render in pixel space: each matrix element maps to a bs x bs block
-    size_t prows = vr * bs;
-    size_t pcols = vc * bs;
+    // Render in pixel space: each output matrix element maps to a bs x bs block
+    size_t prows = out_r * bs;
+    size_t pcols = out_c * bs;
 
     // Buffer all output, then flush once
     std::ostringstream buf;

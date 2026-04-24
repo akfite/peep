@@ -27,6 +27,7 @@ TEST(Options, DefaultValues) {
     EXPECT_EQ(opts.crop_c0(), 0);
     EXPECT_EQ(opts.crop_h(), 0u);
     EXPECT_EQ(opts.crop_w(), 0u);
+    EXPECT_EQ(opts.fit(), Fit::Resample);
 }
 
 TEST(Options, ChainableSetters) {
@@ -37,7 +38,8 @@ TEST(Options, ChainableSetters) {
                        .block_size(3)
                        .layout(Layout::ColMajor)
                        .ostream(oss)
-                       .crop(4, 5, 6, 7);
+                       .crop(4, 5, 6, 7)
+                       .fit(Fit::Trim);
 
     // Chaining must return the same object
     EXPECT_EQ(&ref, &opts);
@@ -52,6 +54,7 @@ TEST(Options, ChainableSetters) {
     EXPECT_EQ(opts.crop_c0(), 5u);
     EXPECT_EQ(opts.crop_h(), 6u);
     EXPECT_EQ(opts.crop_w(), 7u);
+    EXPECT_EQ(opts.fit(), Fit::Trim);
 }
 
 TEST(Options, ClimIndividualSetters) {
@@ -635,6 +638,100 @@ TEST(DefaultColormap, OptionsOverrideStillWorks) {
     EXPECT_EQ(opts.colormap(), Colormap::Gray);
     // Restore
     set_default_colormap(Colormap::Gray);
+}
+
+// ---------------------------------------------------------------------------
+// Fit — terminal auto-sizing
+// ---------------------------------------------------------------------------
+
+namespace {
+TerminalSize ts(size_t rows, size_t cols, bool valid = true) {
+    TerminalSize t;
+    t.rows = rows;
+    t.cols = cols;
+    t.valid = valid;
+    return t;
+}
+} // namespace
+
+TEST(Fit, InvalidTerminalIsNoop) {
+    // With no usable terminal size, all modes are identity.
+    for (Fit m : {Fit::Off, Fit::Resample, Fit::Trim}) {
+        FitResolution r = resolve_fit(100, 200, 1, m, ts(0, 0, false));
+        EXPECT_EQ(r.out_r, 100u);
+        EXPECT_EQ(r.out_c, 200u);
+        EXPECT_FALSE(r.resample);
+    }
+}
+
+TEST(Fit, OffIgnoresTerminalSize) {
+    // Even with a too-small terminal, Off leaves dimensions alone.
+    FitResolution r = resolve_fit(100, 200, 1, Fit::Off, ts(10, 20));
+    EXPECT_EQ(r.out_r, 100u);
+    EXPECT_EQ(r.out_c, 200u);
+    EXPECT_FALSE(r.resample);
+}
+
+TEST(Fit, FitsExactlyIsNoop) {
+    // vr*bs = 20 pixel rows = 10 cells, vc*bs = 40 cells → fits exactly.
+    FitResolution r = resolve_fit(20, 40, 1, Fit::Resample, ts(10, 40));
+    EXPECT_EQ(r.out_r, 20u);
+    EXPECT_EQ(r.out_c, 40u);
+    EXPECT_FALSE(r.resample);
+}
+
+TEST(Fit, ResampleShrinksBothAxes) {
+    // 100 rows × 200 cols, bs=1, terminal 10 rows × 40 cols.
+    // Max pixel cols = 40, max pixel rows = 20. Caps: out_c=40, out_r=20.
+    FitResolution r = resolve_fit(100, 200, 1, Fit::Resample, ts(10, 40));
+    EXPECT_EQ(r.out_r, 20u);
+    EXPECT_EQ(r.out_c, 40u);
+    EXPECT_TRUE(r.resample);
+}
+
+TEST(Fit, ResampleShrinksOnlyWidth) {
+    // Height fits (10 rows × bs=1 → 10 pixels ≤ 2×50=100). Width overruns.
+    FitResolution r = resolve_fit(10, 200, 1, Fit::Resample, ts(50, 40));
+    EXPECT_EQ(r.out_r, 10u);     // unchanged
+    EXPECT_EQ(r.out_c, 40u);     // capped
+    EXPECT_TRUE(r.resample);
+}
+
+TEST(Fit, TrimSetsSameDimsButMarksNoResample) {
+    // Trim keeps the same output dims as Resample but uses identity sampling.
+    FitResolution r = resolve_fit(100, 200, 1, Fit::Trim, ts(10, 40));
+    EXPECT_EQ(r.out_r, 20u);
+    EXPECT_EQ(r.out_c, 40u);
+    EXPECT_FALSE(r.resample);    // trim → identity sampling, not resample
+}
+
+TEST(Fit, BlockSizeScalesCaps) {
+    // With bs=4, each output cell takes 4 pixel cols. Terminal 40 cols → 10 cells.
+    FitResolution r = resolve_fit(100, 200, 4, Fit::Resample, ts(100, 40));
+    EXPECT_EQ(r.out_c, 10u);
+    EXPECT_TRUE(r.resample);
+}
+
+TEST(Fit, BlockSizeLargerThanTerminalClampsToOne) {
+    // bs=100, terminal only 40 cols wide → can't even render one cell, clamp to 1.
+    FitResolution r = resolve_fit(100, 200, 100, Fit::Resample, ts(100, 40));
+    EXPECT_EQ(r.out_c, 1u);
+    EXPECT_TRUE(r.resample);
+}
+
+TEST(Fit, OstringstreamRendersIdenticallyAcrossModes) {
+    // ostringstream is not a tty, so Resample / Trim / Off must produce the
+    // same bytes. This guards against accidentally activating fit on non-tty
+    // streams (which would silently mutate piped output).
+    std::vector<double> data(50 * 80);
+    for (size_t i = 0; i < data.size(); ++i) data[i] = static_cast<double>(i);
+
+    std::string off      = render_to_string(data.data(), 50, 80, Options().fit(Fit::Off));
+    std::string resample = render_to_string(data.data(), 50, 80, Options().fit(Fit::Resample));
+    std::string trim     = render_to_string(data.data(), 50, 80, Options().fit(Fit::Trim));
+
+    EXPECT_EQ(off, resample);
+    EXPECT_EQ(off, trim);
 }
 
 // ---------------------------------------------------------------------------
