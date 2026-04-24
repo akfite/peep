@@ -128,6 +128,11 @@ Fit only engages when the output stream is a real terminal (stdout/stderr +
 `Off`, so `to_string()` and redirected output are byte-identical regardless of
 mode.
 
+When the terminal reports both cell and pixel dimensions, `Fit::Resample`
+also compensates for terminals whose half-block pixels are not physically
+square. Terminals that do not expose pixel dimensions use the standard `1:2`
+cell assumption.
+
 ## Requirements
 
 - C++11 compiler

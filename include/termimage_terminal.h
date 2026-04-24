@@ -26,6 +26,9 @@ namespace detail {
 struct TerminalSize {
     size_t rows;
     size_t cols;
+    size_t width_px;
+    size_t height_px;
+    bool pixels_valid;
     bool valid;
 };
 
@@ -43,6 +46,9 @@ inline TerminalSize query_terminal_size(const std::ostream& os) {
     TerminalSize ts;
     ts.rows = 0;
     ts.cols = 0;
+    ts.width_px = 0;
+    ts.height_px = 0;
+    ts.pixels_valid = false;
     ts.valid = false;
 
     const int fd = stream_fd(os);
@@ -58,6 +64,15 @@ inline TerminalSize query_terminal_size(const std::ostream& os) {
     if (cols <= 0 || rows <= 0) return ts;
     ts.cols = static_cast<size_t>(cols);
     ts.rows = static_cast<size_t>(rows);
+    CONSOLE_FONT_INFOEX font_info;
+    font_info.cbSize = sizeof(font_info);
+    if (GetCurrentConsoleFontEx(h, FALSE, &font_info)
+        && font_info.dwFontSize.X > 0
+        && font_info.dwFontSize.Y > 0) {
+        ts.width_px = static_cast<size_t>(font_info.dwFontSize.X) * ts.cols;
+        ts.height_px = static_cast<size_t>(font_info.dwFontSize.Y) * ts.rows;
+        ts.pixels_valid = true;
+    }
     ts.valid = true;
 #else
     if (!isatty(fd)) return ts;
@@ -66,6 +81,11 @@ inline TerminalSize query_terminal_size(const std::ostream& os) {
     if (ws.ws_row == 0 || ws.ws_col == 0) return ts;
     ts.rows = static_cast<size_t>(ws.ws_row);
     ts.cols = static_cast<size_t>(ws.ws_col);
+    if (ws.ws_xpixel > 0 && ws.ws_ypixel > 0) {
+        ts.width_px = static_cast<size_t>(ws.ws_xpixel);
+        ts.height_px = static_cast<size_t>(ws.ws_ypixel);
+        ts.pixels_valid = true;
+    }
     ts.valid = true;
 #endif
 

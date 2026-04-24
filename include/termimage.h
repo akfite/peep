@@ -364,6 +364,26 @@ struct FitResolution {
     bool resample;
 };
 
+inline double half_block_pixel_aspect(TerminalSize ts) {
+    if (!ts.valid || !ts.pixels_valid
+        || ts.rows == 0 || ts.cols == 0
+        || ts.width_px == 0 || ts.height_px == 0) {
+        return 1.0;
+    }
+
+    const double cell_w = static_cast<double>(ts.width_px)
+                          / static_cast<double>(ts.cols);
+    const double cell_h = static_cast<double>(ts.height_px)
+                          / static_cast<double>(ts.rows);
+    const double aspect = (cell_h * 0.5) / cell_w;
+    if (!std::isfinite(aspect) || aspect <= 0.0) return 1.0;
+    return aspect;
+}
+
+inline size_t rounded_size(double v) {
+    return (v > 1.0) ? static_cast<size_t>(v + 0.5) : 1;
+}
+
 inline FitResolution resolve_fit(size_t vr, size_t vc, size_t bs,
                                  Fit requested, TerminalSize ts) {
     FitResolution r;
@@ -376,28 +396,32 @@ inline FitResolution resolve_fit(size_t vr, size_t vc, size_t bs,
     const size_t max_prows = ts.rows * 2; // 2 pixel rows per half-block cell
     const size_t pcols_needed = vc * bs;
     const size_t prows_needed = vr * bs;
-    if (pcols_needed <= max_pcols && prows_needed <= max_prows) return r;
+    const double pixel_aspect = half_block_pixel_aspect(ts);
+    const bool correct_aspect = std::fabs(pixel_aspect - 1.0) > 0.01;
+    if (pcols_needed <= max_pcols && prows_needed <= max_prows
+        && (requested != Fit::Resample || !correct_aspect)) {
+        return r;
+    }
 
     if (requested == Fit::Resample) {
         // Aspect-preserving: pick a single uniform scale factor from the tighter
-        // axis and apply to both, so vc:vr is preserved in pixels (and therefore
-        // on screen, since a half-block pixel is square in a 1:2 terminal cell).
-        //
-        // width-limited ⟺ max_pcols/pcols_needed < max_prows/prows_needed
-        //              ⟺ max_pcols*prows_needed < max_prows*pcols_needed
-        const bool width_limited =
-            max_pcols * prows_needed < max_prows * pcols_needed;
-        size_t out_pcols, out_prows;
-        if (width_limited) {
-            out_pcols = max_pcols;
-            out_prows = (prows_needed * max_pcols) / pcols_needed;
-        } else {
-            out_prows = max_prows;
-            out_pcols = (pcols_needed * max_prows) / prows_needed;
-        }
-        r.out_c = (out_pcols / bs) ? (out_pcols / bs) : 1;
-        r.out_r = (out_prows / bs) ? (out_prows / bs) : 1;
-        r.resample = true;
+        // axis and apply to both. When the terminal reports pixel dimensions,
+        // compensate for terminals whose half-block pixels are not quite square.
+        const double width_scale =
+            static_cast<double>(max_pcols) / static_cast<double>(pcols_needed);
+        const double height_scale =
+            (static_cast<double>(max_prows) * pixel_aspect)
+            / static_cast<double>(prows_needed);
+        double scale = std::min(width_scale, height_scale);
+        if (scale > 1.0) scale = 1.0;
+
+        const size_t cap_c = (max_pcols / bs) ? (max_pcols / bs) : 1;
+        const size_t cap_r = (max_prows / bs) ? (max_prows / bs) : 1;
+        r.out_c = rounded_size(static_cast<double>(vc) * scale);
+        r.out_r = rounded_size(static_cast<double>(vr) * scale / pixel_aspect);
+        if (r.out_c > cap_c) r.out_c = cap_c;
+        if (r.out_r > cap_r) r.out_r = cap_r;
+        r.resample = (r.out_r != vr || r.out_c != vc);
     } else { // Fit::Trim
         // Identity sampling: no stretching possible, so we fill the terminal
         // with as much of the top-left of the source as fits.

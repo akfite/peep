@@ -768,10 +768,14 @@ TEST(DefaultColormap, OptionsOverrideStillWorks) {
 // ---------------------------------------------------------------------------
 
 namespace {
-TerminalSize ts(size_t rows, size_t cols, bool valid = true) {
+TerminalSize ts(size_t rows, size_t cols, bool valid = true,
+                size_t width_px = 0, size_t height_px = 0) {
     TerminalSize t;
     t.rows = rows;
     t.cols = cols;
+    t.width_px = width_px;
+    t.height_px = height_px;
+    t.pixels_valid = width_px > 0 && height_px > 0;
     t.valid = valid;
     return t;
 }
@@ -843,6 +847,25 @@ TEST(Fit, ResamplePreservesSquareAspect) {
     EXPECT_EQ(r.out_c, 20u);
     EXPECT_EQ(r.out_r, 20u);  // square stays square
     EXPECT_TRUE(r.resample);
+}
+
+TEST(Fit, ResampleUsesDetectedTerminalPixelAspect) {
+    // 100 cols in 1000px -> 10px-wide cells.
+    // 100 rows in 2200px -> 22px-tall cells.
+    // Half-block pixels are therefore 11/10 as tall as they are wide, so a
+    // square source should render with fewer output rows.
+    FitResolution r = resolve_fit(100, 100, 1, Fit::Resample,
+                                  ts(100, 100, true, 1000, 2200));
+    EXPECT_EQ(r.out_c, 100u);
+    EXPECT_EQ(r.out_r, 91u);
+    EXPECT_TRUE(r.resample);
+}
+
+TEST(Fit, PixelAspectFallsBackToSquareWhenPixelsAreUnavailable) {
+    FitResolution r = resolve_fit(100, 100, 1, Fit::Resample, ts(100, 100));
+    EXPECT_EQ(r.out_c, 100u);
+    EXPECT_EQ(r.out_r, 100u);
+    EXPECT_FALSE(r.resample);
 }
 
 TEST(Fit, TrimFillsTerminalWithoutAspectConstraint) {
