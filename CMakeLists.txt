@@ -9,6 +9,15 @@ target_include_directories(termimage INTERFACE
 )
 target_compile_features(termimage INTERFACE cxx_std_11)
 
+# --- Install -----------------------------------------------------------------
+install(TARGETS termimage EXPORT termimageTargets)
+install(DIRECTORY include/ DESTINATION include)
+install(EXPORT termimageTargets
+    FILE termimageConfig.cmake
+    NAMESPACE termimage::
+    DESTINATION lib/cmake/termimage
+)
+
 # --- Examples ----------------------------------------------------------------
 option(TERMIMAGE_BUILD_EXAMPLES "Build example programs" ON)
 
