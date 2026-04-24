@@ -2,8 +2,10 @@ import os
 import glob
 
 def main():
-    asset_dir = "../colormaps"
-    output_file = os.path.join("..", "include", "termimage_colormaps.h")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.dirname(script_dir)
+    asset_dir = os.path.join(repo_root, "colormaps")
+    output_file = os.path.join(repo_root, "include", "termimage_colormaps.h")
 
     files = sorted(glob.glob(os.path.join(asset_dir, "*.bin")))
 
