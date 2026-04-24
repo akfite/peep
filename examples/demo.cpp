@@ -76,6 +76,29 @@ int main() {
         termimage::print(data, 2, 4,
             termimage::Options().colormap("magma").clim(0.0, 1.0).block_size(3));
     }
+    std::cout << std::endl;
+
+    // 6. MATLAB peaks — classic scientific visualization surface
+    std::cout << "=== MATLAB peaks (viridis) ===" << std::endl;
+    {
+        const int n = 49;
+        std::vector<double> peaks(n * n);
+        for (int r = 0; r < n; ++r) {
+            double y = -3.0 + 6.0 * r / (n - 1);
+            for (int c = 0; c < n; ++c) {
+                double x = -3.0 + 6.0 * c / (n - 1);
+                peaks[r * n + c] =
+                    3.0 * (1 - x) * (1 - x)
+                        * std::exp(-x * x - (y + 1) * (y + 1))
+                    - 10.0 * (x / 5.0 - x * x * x - y * y * y * y * y)
+                        * std::exp(-x * x - y * y)
+                    - 1.0 / 3.0
+                        * std::exp(-(x + 1) * (x + 1) - y * y);
+            }
+        }
+        termimage::print(peaks.data(), n, n,
+            termimage::Options().colormap("viridis"));
+    }
 
     return 0;
 }
