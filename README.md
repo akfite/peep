@@ -18,7 +18,7 @@ termimage::print(data_vector, n_rows, n_cols);
 - **Crop**: render a subregion without copying data
 - **Upscale**: block upscale small matrices for visibility
 - **Row-major & column-major** memory layout support
-- **NaN & Inf aware** — NaN cells render as transparent gaps; ±Inf clamps to the color range
+- **NaN & Inf aware** — NaN cells render as transparent gaps and ±Inf clamps to the color range by default; both are color-configurable
 - **Any numeric type** — templated over `int`, `float`, `double`, etc.
 
 ## Quick Start
@@ -90,6 +90,8 @@ All setters are chainable and return `Options&`.
 | `.colormap("name")` | | Set by string (`"gray"`, `"viridis"`, `"plasma"`, `"inferno"`, `"magma"`, `"cividis"`, `"coolwarm"`, `"gnuplot"`, `"turbo"`). |
 | `.colormap(ColormapLut)` | `.custom_colormap()` | Set a custom 256-entry RGB LUT copied from `std::array<std::uint8_t, 768>`. |
 | `.colormap(vector<uint8_t>)` | `.custom_colormap()` | Set a custom LUT from a vector with exactly 768 bytes. |
+| `.nan_color(Color)` | `.nan_color()` / `.has_nan_color()` | Render NaN values with a fixed RGB color instead of transparent gaps. |
+| `.inf_color(Color)` / `.inf_colors(neg, pos)` | `.neg_inf_color()` / `.pos_inf_color()` | Render infinities with fixed RGB colors instead of colormap endpoints. |
 | `.block_size(n)` | `.block_size()` | Pixel scale factor per matrix element. Default: `1`. |
 | `.layout(Layout)` | `.layout()` | `Layout::RowMajor` (default) or `Layout::ColMajor`. |
 | `.ostream(os)` | `.ostream()` | Output stream. Default: `std::cout`. |

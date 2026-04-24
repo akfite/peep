@@ -23,6 +23,9 @@ TEST(Options, DefaultValues) {
     EXPECT_TRUE(std::isnan(opts.clim_lo()));
     EXPECT_TRUE(std::isnan(opts.clim_hi()));
     EXPECT_EQ(opts.colormap(), Colormap::Gray);
+    EXPECT_FALSE(opts.has_nan_color());
+    EXPECT_FALSE(opts.has_neg_inf_color());
+    EXPECT_FALSE(opts.has_pos_inf_color());
     EXPECT_EQ(opts.block_size(), 1);
     EXPECT_EQ(opts.layout(), Layout::RowMajor);
     EXPECT_EQ(&opts.ostream(), &std::cout);
@@ -70,6 +73,34 @@ TEST(Options, ClimIndividualSetters) {
     opts.clim_lo(-5.0).clim_hi(10.0);
     EXPECT_DOUBLE_EQ(opts.clim_lo(), -5.0);
     EXPECT_DOUBLE_EQ(opts.clim_hi(), 10.0);
+}
+
+TEST(Options, SpecialValueColorSetters) {
+    Options opts;
+    opts.nan_color(1, 2, 3)
+        .inf_colors(Color{4, 5, 6}, Color{7, 8, 9});
+
+    EXPECT_TRUE(opts.has_nan_color());
+    EXPECT_EQ(opts.nan_color(), (Color{1, 2, 3}));
+    EXPECT_TRUE(opts.has_neg_inf_color());
+    EXPECT_EQ(opts.neg_inf_color(), (Color{4, 5, 6}));
+    EXPECT_TRUE(opts.has_pos_inf_color());
+    EXPECT_EQ(opts.pos_inf_color(), (Color{7, 8, 9}));
+
+    opts.clear_nan_color().clear_inf_colors();
+    EXPECT_FALSE(opts.has_nan_color());
+    EXPECT_FALSE(opts.has_neg_inf_color());
+    EXPECT_FALSE(opts.has_pos_inf_color());
+}
+
+TEST(Options, SharedInfColorSetterSetsBothSigns) {
+    Options opts;
+    opts.inf_color(10, 20, 30);
+
+    EXPECT_TRUE(opts.has_neg_inf_color());
+    EXPECT_TRUE(opts.has_pos_inf_color());
+    EXPECT_EQ(opts.neg_inf_color(), (Color{10, 20, 30}));
+    EXPECT_EQ(opts.pos_inf_color(), (Color{10, 20, 30}));
 }
 
 TEST(Options, CropTwoArgSetsOpenEnd) {
@@ -308,6 +339,16 @@ TEST(Render, TopValueBottomNaNUsesUpperHalfBlock) {
     EXPECT_NE(out.find("\xe2\x96\x80"), std::string::npos);
 }
 
+TEST(Render, ConfiguredNaNColorRendersAsColoredPixels) {
+    double nan = std::numeric_limits<double>::quiet_NaN();
+    double data[] = {nan, nan, nan, nan};
+    std::string out = render_to_string(data, 2, 2,
+        Options().nan_color(9, 8, 7));
+
+    EXPECT_NE(out.find("9;8;7"), std::string::npos);
+    EXPECT_NE(out.find("\xe2\x96\x84"), std::string::npos);
+}
+
 // ---------------------------------------------------------------------------
 // Render – Infinity handling
 // ---------------------------------------------------------------------------
@@ -472,6 +513,17 @@ TEST(Render, IntegerDataType) {
     std::string out = oss.str();
     EXPECT_FALSE(out.empty());
     EXPECT_NE(out.find("\x1b["), std::string::npos);
+}
+
+TEST(Render, ConfiguredInfColorsOverrideColormapEndpoints) {
+    double inf = std::numeric_limits<double>::infinity();
+    double data[] = {-inf, inf};
+    std::string out = render_to_string(data, 1, 2,
+        Options().clim(0.0, 1.0)
+                 .inf_colors(Color{1, 2, 3}, Color{4, 5, 6}));
+
+    EXPECT_NE(out.find("1;2;3"), std::string::npos);
+    EXPECT_NE(out.find("4;5;6"), std::string::npos);
 }
 
 TEST(Render, FloatDataType) {

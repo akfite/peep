@@ -30,6 +30,12 @@ namespace termimage {
 
 typedef std::array<std::uint8_t, 768> ColormapLut;
 
+struct Color {
+    std::uint8_t r, g, b;
+    bool operator==(const Color& o) const { return r == o.r && g == o.g && b == o.b; }
+    bool operator!=(const Color& o) const { return !(*this == o); }
+};
+
 enum class Layout { RowMajor, ColMajor };
 enum class Colormap {
     Gray,
@@ -88,6 +94,9 @@ struct Options {
     Options()
         : clim_lo_(NAN), clim_hi_(NAN), colormap_(default_colormap()),
         custom_cmap_(), has_custom_cmap_(false),
+        nan_color_(), has_nan_color_(false),
+        neg_inf_color_(), has_neg_inf_color_(false),
+        pos_inf_color_(), has_pos_inf_color_(false),
         block_size_(1), layout_(Layout::RowMajor), out_(&std::cout),
         crop_r0_(0), crop_c0_(0), crop_h_(0), crop_w_(0),
         fit_(Fit::Resample), title_(false), title_text_() {}
@@ -100,6 +109,12 @@ struct Options {
         return has_custom_cmap_ ? &custom_cmap_ : nullptr;
     }
     bool has_custom_colormap() const { return has_custom_cmap_; }
+    Color nan_color() const { return nan_color_; }
+    bool has_nan_color() const { return has_nan_color_; }
+    Color neg_inf_color() const { return neg_inf_color_; }
+    bool has_neg_inf_color() const { return has_neg_inf_color_; }
+    Color pos_inf_color() const { return pos_inf_color_; }
+    bool has_pos_inf_color() const { return has_pos_inf_color_; }
     size_t block_size() const { return block_size_; }
     Layout layout() const { return layout_; }
     std::ostream& ostream() const { return *out_; }
@@ -140,6 +155,49 @@ struct Options {
         has_custom_cmap_ = true;
         return *this;
     }
+    Options& nan_color(Color c) { nan_color_ = c; has_nan_color_ = true; return *this; }
+    Options& nan_color(std::uint8_t r, std::uint8_t g, std::uint8_t b) {
+        return nan_color(Color{r, g, b});
+    }
+    Options& clear_nan_color() { has_nan_color_ = false; return *this; }
+    Options& inf_color(Color c) {
+        neg_inf_color_ = c;
+        pos_inf_color_ = c;
+        has_neg_inf_color_ = true;
+        has_pos_inf_color_ = true;
+        return *this;
+    }
+    Options& inf_color(std::uint8_t r, std::uint8_t g, std::uint8_t b) {
+        return inf_color(Color{r, g, b});
+    }
+    Options& inf_colors(Color neg, Color pos) {
+        neg_inf_color_ = neg;
+        pos_inf_color_ = pos;
+        has_neg_inf_color_ = true;
+        has_pos_inf_color_ = true;
+        return *this;
+    }
+    Options& neg_inf_color(Color c) {
+        neg_inf_color_ = c;
+        has_neg_inf_color_ = true;
+        return *this;
+    }
+    Options& neg_inf_color(std::uint8_t r, std::uint8_t g, std::uint8_t b) {
+        return neg_inf_color(Color{r, g, b});
+    }
+    Options& pos_inf_color(Color c) {
+        pos_inf_color_ = c;
+        has_pos_inf_color_ = true;
+        return *this;
+    }
+    Options& pos_inf_color(std::uint8_t r, std::uint8_t g, std::uint8_t b) {
+        return pos_inf_color(Color{r, g, b});
+    }
+    Options& clear_inf_colors() {
+        has_neg_inf_color_ = false;
+        has_pos_inf_color_ = false;
+        return *this;
+    }
     Options& block_size(size_t s) { block_size_ = (s > 0) ? s : 1; return *this; }
     Options& layout(Layout l) { layout_ = l; return *this; }
     Options& ostream(std::ostream& os) { out_ = &os; return *this; }
@@ -175,6 +233,12 @@ private:
     Colormap colormap_;
     ColormapLut custom_cmap_;
     bool has_custom_cmap_;
+    Color nan_color_;
+    bool has_nan_color_;
+    Color neg_inf_color_;
+    bool has_neg_inf_color_;
+    Color pos_inf_color_;
+    bool has_pos_inf_color_;
     size_t block_size_;
     Layout layout_;
     std::ostream* out_;
@@ -203,11 +267,7 @@ std::string to_string(const std::vector<T>& data, size_t rows, size_t cols,
 // internal API
 namespace detail {
 
-struct RGB {
-    std::uint8_t r, g, b;
-    bool operator==(const RGB& o) const { return r == o.r && g == o.g && b == o.b; }
-    bool operator!=(const RGB& o) const { return !(*this == o); }
-};
+typedef Color RGB;
 
 // Computed grayscale colormap (avoids embedding trivial data)
 inline const ColormapLut& cmap_gray() {
@@ -331,6 +391,16 @@ inline RGB lookup(double normalized, const ColormapLut& cmap) {
     c.g = cmap[idx * 3 + 1];
     c.b = cmap[idx * 3 + 2];
     return c;
+}
+
+inline RGB color_for_value(double v, const ColormapLut& cmap, const Options& opts,
+                           double normalized) {
+    if (std::isnan(v) && opts.has_nan_color()) return opts.nan_color();
+    if (std::isinf(v)) {
+        if (v < 0.0 && opts.has_neg_inf_color()) return opts.neg_inf_color();
+        if (v > 0.0 && opts.has_pos_inf_color()) return opts.pos_inf_color();
+    }
+    return lookup(normalized, cmap);
 }
 
 inline void emit_bg(std::ostream& os, RGB c) {
@@ -498,30 +568,30 @@ void render(const T* data, size_t rows, size_t cols, const Options& opts) {
             size_t mr_top = pr / bs;
             size_t mc = pc / bs;
             double top_val = get(mr_top, mc);
-            bool top_nan = std::isnan(top_val);
+            bool top_transparent = std::isnan(top_val) && !opts.has_nan_color();
 
             double bot_val = NAN;
-            bool bot_nan = true;
+            bool bot_transparent = true;
             if (has_bot) {
                 size_t mr_bot = (pr + 1) / bs;
                 bot_val = get(mr_bot, mc);
-                bot_nan = std::isnan(bot_val);
+                bot_transparent = std::isnan(bot_val) && !opts.has_nan_color();
             }
 
-            if (top_nan && bot_nan) {
+            if (top_transparent && bot_transparent) {
                 do_reset();
                 buf << ' ';
-            } else if (top_nan) {
+            } else if (top_transparent) {
                 do_reset();
-                set_fg(lookup(normalize(bot_val), cmap));
+                set_fg(color_for_value(bot_val, cmap, opts, normalize(bot_val)));
                 emit_lower_half(buf);
-            } else if (bot_nan) {
+            } else if (bot_transparent) {
                 do_reset();
-                set_fg(lookup(normalize(top_val), cmap));
+                set_fg(color_for_value(top_val, cmap, opts, normalize(top_val)));
                 emit_upper_half(buf);
             } else {
-                set_bg(lookup(normalize(top_val), cmap));
-                set_fg(lookup(normalize(bot_val), cmap));
+                set_bg(color_for_value(top_val, cmap, opts, normalize(top_val)));
+                set_fg(color_for_value(bot_val, cmap, opts, normalize(bot_val)));
                 emit_lower_half(buf);
             }
         }
