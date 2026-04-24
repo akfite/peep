@@ -28,6 +28,11 @@ enum class Colormap { Gray, Magma, Viridis };
 
 namespace detail {
 
+inline Colormap& default_colormap_ref() {
+    static Colormap cmap = Colormap::Gray;
+    return cmap;
+}
+
 inline std::string str_tolower(const std::string& s) {
     std::string out = s;
     std::transform(out.begin(), out.end(), out.begin(),
@@ -37,9 +42,14 @@ inline std::string str_tolower(const std::string& s) {
 
 } // namespace detail
 
+// Global default colormap used by Options() when no colormap is specified.
+inline Colormap default_colormap() { return detail::default_colormap_ref(); }
+inline void set_default_colormap(Colormap c) { detail::default_colormap_ref() = c; }
+
 struct Options {
     Options()
-        : clim_lo_(NAN), clim_hi_(NAN), colormap_(Colormap::Viridis),
+        : clim_lo_(NAN), clim_hi_(NAN), colormap_(default_colormap()),
+        custom_cmap_(nullptr),
         block_size_(1), layout_(Layout::RowMajor), out_(&std::cout),
         crop_r0_(0), crop_c0_(0), crop_h_(0), crop_w_(0) {}
 
@@ -47,6 +57,7 @@ struct Options {
     double clim_lo() const { return clim_lo_; }
     double clim_hi() const { return clim_hi_; }
     Colormap colormap() const { return colormap_; }
+    const unsigned char* custom_colormap() const { return custom_cmap_; }
     size_t block_size() const { return block_size_; }
     Layout layout() const { return layout_; }
     std::ostream& ostream() const { return *out_; }
@@ -59,14 +70,17 @@ struct Options {
     Options& clim(double lo, double hi) { clim_lo_ = lo; clim_hi_ = hi; return *this; }
     Options& clim_lo(double v) { clim_lo_ = v; return *this; }
     Options& clim_hi(double v) { clim_hi_ = v; return *this; }
-    Options& colormap(Colormap c) { colormap_ = c; return *this; }
+    Options& colormap(Colormap c) { colormap_ = c; custom_cmap_ = nullptr; return *this; }
     Options& colormap(const std::string& name) {
+        custom_cmap_ = nullptr;
         std::string lower = detail::str_tolower(name);
         if (lower == "viridis") colormap_ = Colormap::Viridis;
         else if (lower == "magma") colormap_ = Colormap::Magma;
         else colormap_ = Colormap::Gray;
         return *this;
     }
+    // Custom colormap: pointer to 256 RGB triplets (768 bytes)
+    Options& colormap(const unsigned char* lut) { custom_cmap_ = lut; return *this; }
     Options& block_size(size_t s) { block_size_ = (s > 0) ? s : 1; return *this; }
     Options& layout(Layout l) { layout_ = l; return *this; }
     Options& ostream(std::ostream& os) { out_ = &os; return *this; }
@@ -88,6 +102,7 @@ private:
     double clim_lo_;
     double clim_hi_;
     Colormap colormap_;
+    const unsigned char* custom_cmap_;
     size_t block_size_;
     Layout layout_;
     std::ostream* out_;
@@ -110,20 +125,43 @@ struct RGB {
     bool operator!=(const RGB& o) const { return !(*this == o); }
 };
 
+// Computed grayscale colormap (avoids embedding trivial data)
+inline const unsigned char* cmap_gray() {
+    static unsigned char lut[768]; // 256 * 3
+    static bool init = false;
+    if (!init) {
+        for (int i = 0; i < 256; ++i) {
+            unsigned char v = static_cast<unsigned char>(i);
+            lut[i * 3 + 0] = v;
+            lut[i * 3 + 1] = v;
+            lut[i * 3 + 2] = v;
+        }
+        init = true;
+    }
+    return lut;
+}
+
 inline const unsigned char* find_colormap(const std::string& name) {
     std::string lower = str_tolower(name);
+    if (lower == "gray" || lower == "grey") return cmap_gray();
     for (int i = 0; i < CMAP_COUNT; ++i) {
         if (lower == CMAP_NAMES[i]) return CMAP_DATA[i];
     }
-    return CMAP_GRAY;
+    return cmap_gray();
 }
 
 inline const unsigned char* find_colormap(Colormap cmap) {
     switch (cmap) {
         case Colormap::Magma:   return CMAP_MAGMA;
         case Colormap::Viridis: return CMAP_VIRIDIS;
-        default:                return CMAP_GRAY;
+        default:                return cmap_gray();
     }
+}
+
+// Resolve the effective colormap from Options (custom takes priority)
+inline const unsigned char* resolve_colormap(const Options& opts) {
+    if (opts.custom_colormap()) return opts.custom_colormap();
+    return find_colormap(opts.colormap());
 }
 
 inline RGB lookup(double normalized, const unsigned char* cmap) {
@@ -163,7 +201,7 @@ template <typename T>
 void render(const T* data, size_t rows, size_t cols, const Options& opts) {
     if (!data || rows == 0 || cols == 0) return;
 
-    const unsigned char* cmap = find_colormap(opts.colormap());
+    const unsigned char* cmap = resolve_colormap(opts);
     std::ostream& os = opts.ostream();
     const size_t bs = opts.block_size();
     const bool col_major = (opts.layout() == Layout::ColMajor);
@@ -298,9 +336,18 @@ void render(const T* data, size_t rows, size_t cols, const Options& opts) {
     os << buf.str();
 }
 
+template <typename T>
+std::string to_string(const T* data, size_t rows, size_t cols, const Options& opts = Options()) {
+    std::ostringstream oss;
+    Options local = opts;
+    local.ostream(oss);
+    render(data, rows, cols, local);
+    return oss.str();
+}
+
 } // namespace detail
 
-// template definition
+// template definitions
 template <typename T>
 void print(const T* data, size_t rows, size_t cols, const Options& opts) {
     detail::render(data, rows, cols, opts);

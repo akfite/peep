@@ -19,7 +19,7 @@ TEST(Options, DefaultValues) {
     Options opts;
     EXPECT_TRUE(std::isnan(opts.clim_lo()));
     EXPECT_TRUE(std::isnan(opts.clim_hi()));
-    EXPECT_EQ(opts.colormap(), Colormap::Viridis);
+    EXPECT_EQ(opts.colormap(), Colormap::Gray);
     EXPECT_EQ(opts.block_size(), 1);
     EXPECT_EQ(opts.layout(), Layout::RowMajor);
     EXPECT_EQ(&opts.ostream(), &std::cout);
@@ -75,20 +75,21 @@ TEST(Options, CropTwoArgSetsOpenEnd) {
 // ---------------------------------------------------------------------------
 
 TEST(FindColormap, KnownColormapsByString) {
-    EXPECT_EQ(find_colormap("gray"), CMAP_GRAY);
+    EXPECT_EQ(find_colormap("gray"), cmap_gray());
+    EXPECT_EQ(find_colormap("grey"), cmap_gray());
     EXPECT_EQ(find_colormap("magma"), CMAP_MAGMA);
     EXPECT_EQ(find_colormap("viridis"), CMAP_VIRIDIS);
 }
 
 TEST(FindColormap, KnownColormapsByEnum) {
-    EXPECT_EQ(find_colormap(Colormap::Gray), CMAP_GRAY);
+    EXPECT_EQ(find_colormap(Colormap::Gray), cmap_gray());
     EXPECT_EQ(find_colormap(Colormap::Magma), CMAP_MAGMA);
     EXPECT_EQ(find_colormap(Colormap::Viridis), CMAP_VIRIDIS);
 }
 
 TEST(FindColormap, UnknownStringFallsBackToGray) {
-    EXPECT_EQ(find_colormap("nonexistent"), CMAP_GRAY);
-    EXPECT_EQ(find_colormap(""), CMAP_GRAY);
+    EXPECT_EQ(find_colormap("nonexistent"), cmap_gray());
+    EXPECT_EQ(find_colormap(""), cmap_gray());
 }
 
 // ---------------------------------------------------------------------------
@@ -97,12 +98,12 @@ TEST(FindColormap, UnknownStringFallsBackToGray) {
 
 TEST(Lookup, BoundsZeroAndOne) {
     // Gray colormap: index i -> (i, i, i)
-    RGB lo = lookup(0.0, CMAP_GRAY);
+    RGB lo = lookup(0.0, cmap_gray());
     EXPECT_EQ(lo.r, 0);
     EXPECT_EQ(lo.g, 0);
     EXPECT_EQ(lo.b, 0);
 
-    RGB hi = lookup(1.0, CMAP_GRAY);
+    RGB hi = lookup(1.0, cmap_gray());
     EXPECT_EQ(hi.r, 255);
     EXPECT_EQ(hi.g, 255);
     EXPECT_EQ(hi.b, 255);
@@ -110,22 +111,21 @@ TEST(Lookup, BoundsZeroAndOne) {
 
 TEST(Lookup, MidpointGray) {
     // 0.5 * 255 + 0.5 = 128.0 -> index 128
-    RGB mid = lookup(0.5, CMAP_GRAY);
-    // Gray colormap entry 128: value ~0x81
-    EXPECT_NEAR(mid.r, 0x81, 2);
+    RGB mid = lookup(0.5, cmap_gray());
+    EXPECT_EQ(mid.r, 128);
     EXPECT_EQ(mid.r, mid.g);
     EXPECT_EQ(mid.g, mid.b);
 }
 
 TEST(Lookup, ClampsBelowZero) {
-    RGB c = lookup(-1.0, CMAP_GRAY);
+    RGB c = lookup(-1.0, cmap_gray());
     EXPECT_EQ(c.r, 0);
     EXPECT_EQ(c.g, 0);
     EXPECT_EQ(c.b, 0);
 }
 
 TEST(Lookup, ClampsAboveOne) {
-    RGB c = lookup(2.0, CMAP_GRAY);
+    RGB c = lookup(2.0, cmap_gray());
     EXPECT_EQ(c.r, 255);
     EXPECT_EQ(c.g, 255);
     EXPECT_EQ(c.b, 255);
@@ -540,4 +540,131 @@ TEST(Render, LargeMatrixDoesNotCrash) {
     int newlines = 0;
     for (char ch : out) if (ch == '\n') newlines++;
     EXPECT_EQ(newlines, (rows + 1) / 2);  // ceil(200/2) = 100
+}
+
+// ---------------------------------------------------------------------------
+// Computed gray colormap correctness
+// ---------------------------------------------------------------------------
+
+TEST(CmapGray, AllEntriesCorrect) {
+    const unsigned char* g = cmap_gray();
+    for (int i = 0; i < 256; ++i) {
+        EXPECT_EQ(g[i * 3 + 0], static_cast<unsigned char>(i));
+        EXPECT_EQ(g[i * 3 + 1], static_cast<unsigned char>(i));
+        EXPECT_EQ(g[i * 3 + 2], static_cast<unsigned char>(i));
+    }
+}
+
+TEST(CmapGray, StablePointer) {
+    // Repeated calls should return the same pointer (lazy-init singleton)
+    EXPECT_EQ(cmap_gray(), cmap_gray());
+}
+
+// ---------------------------------------------------------------------------
+// Custom colormap
+// ---------------------------------------------------------------------------
+
+TEST(CustomColormap, OverridesEnumColormap) {
+    // Build a trivial all-red LUT
+    static unsigned char red_lut[768];
+    for (int i = 0; i < 256; ++i) {
+        red_lut[i * 3 + 0] = 255;
+        red_lut[i * 3 + 1] = 0;
+        red_lut[i * 3 + 2] = 0;
+    }
+
+    double data[] = {0.0, 0.5, 1.0, 0.25};
+    std::string custom_out = render_to_string(data, 2, 2,
+        Options().colormap(red_lut));
+    std::string viridis_out = render_to_string(data, 2, 2,
+        Options().colormap(Colormap::Viridis));
+    EXPECT_NE(custom_out, viridis_out);
+    // Custom red LUT should produce "255;0;0" in escape sequences
+    EXPECT_NE(custom_out.find("255;0;0"), std::string::npos);
+}
+
+TEST(CustomColormap, EnumSetterClearsCustom) {
+    static unsigned char lut[768] = {};
+    Options opts;
+    opts.colormap(lut);
+    EXPECT_NE(opts.custom_colormap(), nullptr);
+    opts.colormap(Colormap::Viridis);
+    EXPECT_EQ(opts.custom_colormap(), nullptr);
+}
+
+TEST(CustomColormap, StringSetterClearsCustom) {
+    static unsigned char lut[768] = {};
+    Options opts;
+    opts.colormap(lut);
+    EXPECT_NE(opts.custom_colormap(), nullptr);
+    opts.colormap("magma");
+    EXPECT_EQ(opts.custom_colormap(), nullptr);
+}
+
+TEST(CustomColormap, DefaultIsNull) {
+    Options opts;
+    EXPECT_EQ(opts.custom_colormap(), nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// Global default colormap
+// ---------------------------------------------------------------------------
+
+TEST(DefaultColormap, InitiallyGray) {
+    EXPECT_EQ(default_colormap(), Colormap::Gray);
+}
+
+TEST(DefaultColormap, SetAndRestore) {
+    Colormap original = default_colormap();
+    set_default_colormap(Colormap::Magma);
+    EXPECT_EQ(default_colormap(), Colormap::Magma);
+
+    // New Options should pick up the global default
+    Options opts;
+    EXPECT_EQ(opts.colormap(), Colormap::Magma);
+
+    // Restore
+    set_default_colormap(original);
+    EXPECT_EQ(default_colormap(), original);
+}
+
+TEST(DefaultColormap, OptionsOverrideStillWorks) {
+    set_default_colormap(Colormap::Viridis);
+    Options opts;
+    opts.colormap(Colormap::Gray);
+    EXPECT_EQ(opts.colormap(), Colormap::Gray);
+    // Restore
+    set_default_colormap(Colormap::Gray);
+}
+
+// ---------------------------------------------------------------------------
+// to_string convenience function
+// ---------------------------------------------------------------------------
+
+TEST(ToString, MatchesPrintOutput) {
+    double data[] = {0.0, 0.5, 1.0, 0.25};
+    // to_string should produce the same output as print-to-ostringstream
+    std::string via_tostring = to_string(data, 2, 2,
+        Options().colormap("magma"));
+    std::string via_print = render_to_string(data, 2, 2,
+        Options().colormap("magma"));
+    EXPECT_EQ(via_tostring, via_print);
+}
+
+TEST(ToString, EmptyOnZeroDimensions) {
+    double data[] = {1.0};
+    EXPECT_EQ(to_string(data, 0, 1), "");
+    EXPECT_EQ(to_string(data, 1, 0), "");
+}
+
+TEST(ToString, DoesNotAffectOriginalOstream) {
+    // Passing opts with a custom ostream — to_string should NOT write to it
+    std::ostringstream oss;
+    Options opts;
+    opts.colormap("gray").ostream(oss);
+    double data[] = {0.0, 1.0};
+    std::string result = to_string(data, 1, 2, opts);
+    EXPECT_FALSE(result.empty());
+    // The original ostream should be untouched
+    EXPECT_EQ(oss.str(), "");
 }
