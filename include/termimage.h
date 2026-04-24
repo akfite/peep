@@ -11,6 +11,7 @@
 #define TERMIMAGE_H
 
 #include <cmath>
+#include <cstddef>
 #include <iostream>
 #include <limits>
 #include <string>
@@ -26,19 +27,19 @@ struct Options {
     Options()
         : clim_lo_(NAN), clim_hi_(NAN), colormap_(Colormap::Viridis),
         block_size_(1), layout_(Layout::RowMajor), out_(&std::cout),
-        crop_r0_(0), crop_c0_(0), crop_h_(-1), crop_w_(-1) {}
+        crop_r0_(0), crop_c0_(0), crop_h_(0), crop_w_(0) {}
 
     // Getters
     double clim_lo() const { return clim_lo_; }
     double clim_hi() const { return clim_hi_; }
     Colormap colormap() const { return colormap_; }
-    int block_size() const { return block_size_; }
+    size_t block_size() const { return block_size_; }
     Layout layout() const { return layout_; }
     std::ostream& ostream() const { return *out_; }
-    int crop_r0() const { return crop_r0_; }
-    int crop_c0() const { return crop_c0_; }
-    int crop_h() const { return crop_h_; }
-    int crop_w() const { return crop_w_; }
+    size_t crop_r0() const { return crop_r0_; }
+    size_t crop_c0() const { return crop_c0_; }
+    size_t crop_h() const { return crop_h_; }
+    size_t crop_w() const { return crop_w_; }
 
     // Chainable setters
     Options& clim(double lo, double hi) { clim_lo_ = lo; clim_hi_ = hi; return *this; }
@@ -51,18 +52,18 @@ struct Options {
         else colormap_ = Colormap::Gray;
         return *this;
     }
-    Options& block_size(int s) { block_size_ = s; return *this; }
+    Options& block_size(size_t s) { block_size_ = s; return *this; }
     Options& layout(Layout l) { layout_ = l; return *this; }
     Options& ostream(std::ostream& os) { out_ = &os; return *this; }
 
     // Crop: from (r0, c0) to end of matrix
-    Options& crop(int r0, int c0) {
+    Options& crop(size_t r0, size_t c0) {
         crop_r0_ = r0; crop_c0_ = c0;
-        crop_h_ = -1; crop_w_ = -1;
+        crop_h_ = 0; crop_w_ = 0;
         return *this;
     }
     // Crop: from (r0, c0) with explicit size h x w
-    Options& crop(int r0, int c0, int h, int w) {
+    Options& crop(size_t r0, size_t c0, size_t h, size_t w) {
         crop_r0_ = r0; crop_c0_ = c0;
         crop_h_ = h; crop_w_ = w;
         return *this;
@@ -72,18 +73,18 @@ private:
     double clim_lo_;
     double clim_hi_;
     Colormap colormap_;
-    int block_size_;
+    size_t block_size_;
     Layout layout_;
     std::ostream* out_;
-    int crop_r0_;
-    int crop_c0_;
-    int crop_h_;
-    int crop_w_;
+    size_t crop_r0_;
+    size_t crop_c0_;
+    size_t crop_h_;
+    size_t crop_w_;
 };
 
 // public API
 template <typename T>
-void print(const T* data, int rows, int cols, const Options& opts = Options());
+void print(const T* data, size_t rows, size_t cols, const Options& opts = Options());
 
 // internal API
 namespace detail {
@@ -139,26 +140,26 @@ inline void emit_lower_half(std::ostream& os) { os << "\xe2\x96\x84"; }
 inline void emit_upper_half(std::ostream& os) { os << "\xe2\x96\x80"; }
 
 template <typename T>
-void render(const T* data, int rows, int cols, const Options& opts) {
-    if (!data || rows <= 0 || cols <= 0) return;
+void render(const T* data, size_t rows, size_t cols, const Options& opts) {
+    if (!data || rows == 0 || cols == 0) return;
 
     const unsigned char* cmap = find_colormap(opts.colormap());
     std::ostream& os = opts.ostream();
-    const int bs = opts.block_size() > 0 ? opts.block_size() : 1;
+    const size_t bs = opts.block_size() > 0 ? opts.block_size() : 1;
     const bool col_major = (opts.layout() == Layout::ColMajor);
 
     // Resolve crop window
-    int r0 = opts.crop_r0() < 0 ? 0 : opts.crop_r0();
-    int c0 = opts.crop_c0() < 0 ? 0 : opts.crop_c0();
+    size_t r0 = opts.crop_r0();
+    size_t c0 = opts.crop_c0();
     if (r0 >= rows || c0 >= cols) return;
-    int vr = (opts.crop_h() < 0) ? (rows - r0) : opts.crop_h();
-    int vc = (opts.crop_w() < 0) ? (cols - c0) : opts.crop_w();
+    size_t vr = (opts.crop_h() == 0) ? (rows - r0) : opts.crop_h();
+    size_t vc = (opts.crop_w() == 0) ? (cols - c0) : opts.crop_w();
     if (r0 + vr > rows) vr = rows - r0;
     if (c0 + vc > cols) vc = cols - c0;
-    if (vr <= 0 || vc <= 0) return;
+    if (vr == 0 || vc == 0) return;
 
     // Element accessor (matrix coords relative to crop origin)
-    auto get = [&](int mr, int mc) -> double {
+    auto get = [&](size_t mr, size_t mc) -> double {
         if (col_major)
             return static_cast<double>(data[(c0 + mc) * rows + (r0 + mr)]);
         else
@@ -174,8 +175,8 @@ void render(const T* data, int rows, int cols, const Options& opts) {
     if (auto_lo || auto_hi) {
         double flo = std::numeric_limits<double>::infinity();
         double fhi = -std::numeric_limits<double>::infinity();
-        for (int mr = 0; mr < vr; ++mr) {
-            for (int mc = 0; mc < vc; ++mc) {
+        for (size_t mr = 0; mr < vr; ++mr) {
+            for (size_t mc = 0; mc < vc; ++mc) {
                 double v = get(mr, mc);
                 if (std::isnan(v) || std::isinf(v)) continue;
                 if (v < flo) flo = v;
@@ -198,22 +199,22 @@ void render(const T* data, int rows, int cols, const Options& opts) {
     };
 
     // Render in pixel space: each matrix element maps to a bs x bs block
-    int prows = vr * bs;
-    int pcols = vc * bs;
+    size_t prows = vr * bs;
+    size_t pcols = vc * bs;
 
-    for (int pr = 0; pr < prows; pr += 2) {
+    for (size_t pr = 0; pr < prows; pr += 2) {
         bool has_bot = (pr + 1 < prows);
 
-        for (int pc = 0; pc < pcols; ++pc) {
-            int mr_top = pr / bs;
-            int mc = pc / bs;
+        for (size_t pc = 0; pc < pcols; ++pc) {
+            size_t mr_top = pr / bs;
+            size_t mc = pc / bs;
             double top_val = get(mr_top, mc);
             bool top_nan = std::isnan(top_val);
 
             double bot_val = NAN;
             bool bot_nan = true;
             if (has_bot) {
-                int mr_bot = (pr + 1) / bs;
+                size_t mr_bot = (pr + 1) / bs;
                 bot_val = get(mr_bot, mc);
                 bot_nan = std::isnan(bot_val);
             }
@@ -245,7 +246,7 @@ void render(const T* data, int rows, int cols, const Options& opts) {
 
 // template definition
 template <typename T>
-void print(const T* data, int rows, int cols, const Options& opts) {
+void print(const T* data, size_t rows, size_t cols, const Options& opts) {
     detail::render(data, rows, cols, opts);
 }
 

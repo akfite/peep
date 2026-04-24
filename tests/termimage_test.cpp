@@ -25,8 +25,8 @@ TEST(Options, DefaultValues) {
     EXPECT_EQ(&opts.ostream(), &std::cout);
     EXPECT_EQ(opts.crop_r0(), 0);
     EXPECT_EQ(opts.crop_c0(), 0);
-    EXPECT_EQ(opts.crop_h(), -1);
-    EXPECT_EQ(opts.crop_w(), -1);
+    EXPECT_EQ(opts.crop_h(), 0u);
+    EXPECT_EQ(opts.crop_w(), 0u);
 }
 
 TEST(Options, ChainableSetters) {
@@ -48,10 +48,10 @@ TEST(Options, ChainableSetters) {
     EXPECT_EQ(opts.block_size(), 3);
     EXPECT_EQ(opts.layout(), Layout::ColMajor);
     EXPECT_EQ(&opts.ostream(), &oss);
-    EXPECT_EQ(opts.crop_r0(), 4);
-    EXPECT_EQ(opts.crop_c0(), 5);
-    EXPECT_EQ(opts.crop_h(), 6);
-    EXPECT_EQ(opts.crop_w(), 7);
+    EXPECT_EQ(opts.crop_r0(), 4u);
+    EXPECT_EQ(opts.crop_c0(), 5u);
+    EXPECT_EQ(opts.crop_h(), 6u);
+    EXPECT_EQ(opts.crop_w(), 7u);
 }
 
 TEST(Options, ClimIndividualSetters) {
@@ -64,10 +64,10 @@ TEST(Options, ClimIndividualSetters) {
 TEST(Options, CropTwoArgSetsOpenEnd) {
     Options opts;
     opts.crop(3, 7);
-    EXPECT_EQ(opts.crop_r0(), 3);
-    EXPECT_EQ(opts.crop_c0(), 7);
-    EXPECT_EQ(opts.crop_h(), -1);
-    EXPECT_EQ(opts.crop_w(), -1);
+    EXPECT_EQ(opts.crop_r0(), 3u);
+    EXPECT_EQ(opts.crop_c0(), 7u);
+    EXPECT_EQ(opts.crop_h(), 0u);
+    EXPECT_EQ(opts.crop_w(), 0u);
 }
 
 // ---------------------------------------------------------------------------
@@ -185,7 +185,7 @@ TEST(Emit, UpperHalfBlock) {
 // Helper: capture render output
 // ---------------------------------------------------------------------------
 
-static std::string render_to_string(const double* data, int rows, int cols,
+static std::string render_to_string(const double* data, size_t rows, size_t cols,
                                      const Options& base = Options()) {
     std::ostringstream oss;
     Options opts = base;
@@ -206,12 +206,6 @@ TEST(Render, ZeroRowsProducesNothing) {
 TEST(Render, ZeroColsProducesNothing) {
     double data[] = {1.0};
     EXPECT_EQ(render_to_string(data, 1, 0), "");
-}
-
-TEST(Render, NegativeDimensionsProducesNothing) {
-    double data[] = {1.0};
-    EXPECT_EQ(render_to_string(data, -1, 5), "");
-    EXPECT_EQ(render_to_string(data, 5, -1), "");
 }
 
 // ---------------------------------------------------------------------------
@@ -436,7 +430,7 @@ TEST(Render, CropClampedToMatrixEdge) {
 TEST(Render, CropTwoArgShowsFromOriginToEnd) {
     double data[16];
     for (int i = 0; i < 16; i++) data[i] = static_cast<double>(i);
-    // crop(1,1) with h=-1,w=-1 should show from (1,1) to end
+    // crop(1,1) with h=0,w=0 should show from (1,1) to end
     std::string out = render_to_string(data, 4, 4, Options().crop(1, 1));
     EXPECT_FALSE(out.empty());
     // Should be smaller than full output (3x3 vs 4x4)
