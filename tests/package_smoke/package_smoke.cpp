@@ -1,4 +1,4 @@
-#include "termimage.h"
+#include <termimage/termimage.hpp>
 
 int main() {
     double data[] = {0.0, 1.0, 2.0, 3.0};

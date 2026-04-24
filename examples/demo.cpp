@@ -1,4 +1,4 @@
-#include "termimage.h"
+#include <termimage/termimage.hpp>
 
 #include <cstddef>
 #include <cstdint>

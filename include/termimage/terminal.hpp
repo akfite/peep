@@ -1,7 +1,7 @@
 // Platform-specific terminal size query, kept out of the core header so
-// termimage.h stays free of <windows.h>/<sys/ioctl.h>.
-#ifndef TERMIMAGE_TERMINAL_H
-#define TERMIMAGE_TERMINAL_H
+// termimage.hpp stays free of <windows.h>/<sys/ioctl.h>.
+#ifndef TERMIMAGE_TERMINAL_HPP
+#define TERMIMAGE_TERMINAL_HPP
 
 #include <cstddef>
 #include <iostream>
@@ -95,4 +95,4 @@ inline TerminalSize query_terminal_size(const std::ostream& os) {
 } // namespace detail
 } // namespace termimage
 
-#endif // TERMIMAGE_TERMINAL_H
+#endif // TERMIMAGE_TERMINAL_HPP

@@ -16,7 +16,7 @@ std::string rendered = termimage::to_string(rgb_vector, n_rows, n_cols,
 - `termimage::print(data, rows, cols, Options().rgb())` for `uint8_t` RGB images
 - `termimage::print(rows, cols, Options().accessor(...))` for custom scalar image containers
 - `termimage::print(rows, cols, Options().rgb_accessor(...))` for custom RGB image containers
-- **Header-only**: `#include "termimage.h"`
+- **Header-only**: `#include <termimage/termimage.hpp>`
 - **Minimal requirements**: C++11 compiler and a modern terminal (with full color support)
 - **Color mapping** with support for `gray`, `viridis`, `plasma`, `inferno`, `magma`, `cividis`, `coolwarm`, `gnuplot`, and `turbo`
 - **Automatic or manual scaling**: computes `clim` from data, or you can set it yourself
@@ -33,7 +33,7 @@ std::string rendered = termimage::to_string(rgb_vector, n_rows, n_cols,
 ## Quick Start
 
 ```cpp
-#include "termimage.h"
+#include <termimage/termimage.hpp>
 #include <cstdint>
 #include <vector>
 
@@ -238,7 +238,7 @@ reason an image gets resampled or trimmed. Use `.block_size(1)` to opt out.
 
 - C++11 compiler
 - A terminal with 24-bit truecolor support
-- `matplotlib` only when regenerating `include/termimage_colormaps.h` with
+- `matplotlib` only when regenerating `include/termimage/colormaps.hpp` with
   `scripts/generate_colormaps.py`
 
 ## License

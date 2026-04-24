@@ -1,4 +1,4 @@
-#include "termimage.h"
+#include <termimage/termimage.hpp>
 
 #include <gtest/gtest.h>
 
