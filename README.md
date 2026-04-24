@@ -85,7 +85,10 @@ target_link_libraries(my_target PRIVATE termimage::termimage)
 
 ### Running Tests
 
-Tests use [GoogleTest](https://github.com/google/googletest) (fetched automatically via CMake `FetchContent`):
+Tests use [GoogleTest](https://github.com/google/googletest). CMake first looks for an installed
+GoogleTest package, then a local source tree such as `build/_deps/googletest-src`
+or `-DTERMIMAGE_GTEST_SOURCE_DIR=/path/to/googletest`. To allow a live
+`FetchContent` download, opt in with `-DTERMIMAGE_FETCH_GTEST=ON`:
 
 ```bash
 cmake -S . -B build -DTERMIMAGE_BUILD_TESTS=ON

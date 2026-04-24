@@ -12,7 +12,7 @@
 #include <vector>
 
 using namespace termimage;
-using namespace termimage::detail;
+namespace tid = termimage::detail;
 
 // ---------------------------------------------------------------------------
 // Options
@@ -181,33 +181,33 @@ TEST(Options, CenterCropSetsCenterAndDimensions) {
 // ---------------------------------------------------------------------------
 
 TEST(FindColormap, KnownColormapsByString) {
-    EXPECT_EQ(&find_colormap("gray"), &cmap_gray());
-    EXPECT_EQ(&find_colormap("grey"), &cmap_gray());
-    EXPECT_EQ(&find_colormap("magma"), &CMAP_MAGMA);
-    EXPECT_EQ(&find_colormap("viridis"), &CMAP_VIRIDIS);
-    EXPECT_EQ(&find_colormap("plasma"), &CMAP_PLASMA);
-    EXPECT_EQ(&find_colormap("inferno"), &CMAP_INFERNO);
-    EXPECT_EQ(&find_colormap("cividis"), &CMAP_CIVIDIS);
-    EXPECT_EQ(&find_colormap("coolwarm"), &CMAP_COOLWARM);
-    EXPECT_EQ(&find_colormap("gnuplot"), &CMAP_GNUPLOT);
-    EXPECT_EQ(&find_colormap("turbo"), &CMAP_TURBO);
+    EXPECT_EQ(&tid::find_colormap("gray"), &tid::cmap_gray());
+    EXPECT_EQ(&tid::find_colormap("grey"), &tid::cmap_gray());
+    EXPECT_EQ(&tid::find_colormap("magma"), &tid::CMAP_MAGMA);
+    EXPECT_EQ(&tid::find_colormap("viridis"), &tid::CMAP_VIRIDIS);
+    EXPECT_EQ(&tid::find_colormap("plasma"), &tid::CMAP_PLASMA);
+    EXPECT_EQ(&tid::find_colormap("inferno"), &tid::CMAP_INFERNO);
+    EXPECT_EQ(&tid::find_colormap("cividis"), &tid::CMAP_CIVIDIS);
+    EXPECT_EQ(&tid::find_colormap("coolwarm"), &tid::CMAP_COOLWARM);
+    EXPECT_EQ(&tid::find_colormap("gnuplot"), &tid::CMAP_GNUPLOT);
+    EXPECT_EQ(&tid::find_colormap("turbo"), &tid::CMAP_TURBO);
 }
 
 TEST(FindColormap, KnownColormapsByEnum) {
-    EXPECT_EQ(&find_colormap(Colormap::Gray), &cmap_gray());
-    EXPECT_EQ(&find_colormap(Colormap::Magma), &CMAP_MAGMA);
-    EXPECT_EQ(&find_colormap(Colormap::Viridis), &CMAP_VIRIDIS);
-    EXPECT_EQ(&find_colormap(Colormap::Plasma), &CMAP_PLASMA);
-    EXPECT_EQ(&find_colormap(Colormap::Inferno), &CMAP_INFERNO);
-    EXPECT_EQ(&find_colormap(Colormap::Cividis), &CMAP_CIVIDIS);
-    EXPECT_EQ(&find_colormap(Colormap::Coolwarm), &CMAP_COOLWARM);
-    EXPECT_EQ(&find_colormap(Colormap::Gnuplot), &CMAP_GNUPLOT);
-    EXPECT_EQ(&find_colormap(Colormap::Turbo), &CMAP_TURBO);
+    EXPECT_EQ(&tid::find_colormap(Colormap::Gray), &tid::cmap_gray());
+    EXPECT_EQ(&tid::find_colormap(Colormap::Magma), &tid::CMAP_MAGMA);
+    EXPECT_EQ(&tid::find_colormap(Colormap::Viridis), &tid::CMAP_VIRIDIS);
+    EXPECT_EQ(&tid::find_colormap(Colormap::Plasma), &tid::CMAP_PLASMA);
+    EXPECT_EQ(&tid::find_colormap(Colormap::Inferno), &tid::CMAP_INFERNO);
+    EXPECT_EQ(&tid::find_colormap(Colormap::Cividis), &tid::CMAP_CIVIDIS);
+    EXPECT_EQ(&tid::find_colormap(Colormap::Coolwarm), &tid::CMAP_COOLWARM);
+    EXPECT_EQ(&tid::find_colormap(Colormap::Gnuplot), &tid::CMAP_GNUPLOT);
+    EXPECT_EQ(&tid::find_colormap(Colormap::Turbo), &tid::CMAP_TURBO);
 }
 
 TEST(FindColormap, UnknownStringFallsBackToGray) {
-    EXPECT_EQ(&find_colormap("nonexistent"), &cmap_gray());
-    EXPECT_EQ(&find_colormap(""), &cmap_gray());
+    EXPECT_EQ(&tid::find_colormap("nonexistent"), &tid::cmap_gray());
+    EXPECT_EQ(&tid::find_colormap(""), &tid::cmap_gray());
 }
 
 // ---------------------------------------------------------------------------
@@ -216,12 +216,12 @@ TEST(FindColormap, UnknownStringFallsBackToGray) {
 
 TEST(Lookup, BoundsZeroAndOne) {
     // Gray colormap: index i -> (i, i, i)
-    RGB lo = lookup(0.0, cmap_gray());
+    tid::RGB lo = tid::lookup(0.0, tid::cmap_gray());
     EXPECT_EQ(lo.r, 0);
     EXPECT_EQ(lo.g, 0);
     EXPECT_EQ(lo.b, 0);
 
-    RGB hi = lookup(1.0, cmap_gray());
+    tid::RGB hi = tid::lookup(1.0, tid::cmap_gray());
     EXPECT_EQ(hi.r, 255);
     EXPECT_EQ(hi.g, 255);
     EXPECT_EQ(hi.b, 255);
@@ -229,21 +229,21 @@ TEST(Lookup, BoundsZeroAndOne) {
 
 TEST(Lookup, MidpointGray) {
     // 0.5 * 255 + 0.5 = 128.0 -> index 128
-    RGB mid = lookup(0.5, cmap_gray());
+    tid::RGB mid = tid::lookup(0.5, tid::cmap_gray());
     EXPECT_EQ(mid.r, 128);
     EXPECT_EQ(mid.r, mid.g);
     EXPECT_EQ(mid.g, mid.b);
 }
 
 TEST(Lookup, ClampsBelowZero) {
-    RGB c = lookup(-1.0, cmap_gray());
+    tid::RGB c = tid::lookup(-1.0, tid::cmap_gray());
     EXPECT_EQ(c.r, 0);
     EXPECT_EQ(c.g, 0);
     EXPECT_EQ(c.b, 0);
 }
 
 TEST(Lookup, ClampsAboveOne) {
-    RGB c = lookup(2.0, cmap_gray());
+    tid::RGB c = tid::lookup(2.0, tid::cmap_gray());
     EXPECT_EQ(c.r, 255);
     EXPECT_EQ(c.g, 255);
     EXPECT_EQ(c.b, 255);
@@ -251,13 +251,13 @@ TEST(Lookup, ClampsAboveOne) {
 
 TEST(Lookup, MagmaEndpoints) {
     // Magma index 0: (0x00, 0x00, 0x04)
-    RGB lo = lookup(0.0, CMAP_MAGMA);
+    tid::RGB lo = tid::lookup(0.0, tid::CMAP_MAGMA);
     EXPECT_EQ(lo.r, 0x00);
     EXPECT_EQ(lo.g, 0x00);
     EXPECT_EQ(lo.b, 0x04);
 
     // Magma index 255 from matplotlib's magma colormap.
-    RGB hi = lookup(1.0, CMAP_MAGMA);
+    tid::RGB hi = tid::lookup(1.0, tid::CMAP_MAGMA);
     EXPECT_EQ(hi.r, 0xfc);
     EXPECT_EQ(hi.g, 0xfd);
     EXPECT_EQ(hi.b, 0xbf);
@@ -269,33 +269,33 @@ TEST(Lookup, MagmaEndpoints) {
 
 TEST(Emit, BackgroundEscape) {
     std::ostringstream oss;
-    RGB c = {10, 20, 30};
-    emit_bg(oss, c);
+    tid::RGB c = {10, 20, 30};
+    tid::emit_bg(oss, c);
     EXPECT_EQ(oss.str(), "\x1b[48;2;10;20;30m");
 }
 
 TEST(Emit, ForegroundEscape) {
     std::ostringstream oss;
-    RGB c = {255, 128, 0};
-    emit_fg(oss, c);
+    tid::RGB c = {255, 128, 0};
+    tid::emit_fg(oss, c);
     EXPECT_EQ(oss.str(), "\x1b[38;2;255;128;0m");
 }
 
 TEST(Emit, Reset) {
     std::ostringstream oss;
-    emit_reset(oss);
+    tid::emit_reset(oss);
     EXPECT_EQ(oss.str(), "\x1b[0m");
 }
 
 TEST(Emit, LowerHalfBlock) {
     std::ostringstream oss;
-    emit_lower_half(oss);
+    tid::emit_lower_half(oss);
     EXPECT_EQ(oss.str(), "\xe2\x96\x84");
 }
 
 TEST(Emit, UpperHalfBlock) {
     std::ostringstream oss;
-    emit_upper_half(oss);
+    tid::emit_upper_half(oss);
     EXPECT_EQ(oss.str(), "\xe2\x96\x80");
 }
 
@@ -891,7 +891,7 @@ TEST(Render, LargeMatrixDoesNotCrash) {
 // ---------------------------------------------------------------------------
 
 TEST(CmapGray, AllEntriesCorrect) {
-    const ColormapLut& g = cmap_gray();
+    const ColormapLut& g = tid::cmap_gray();
     for (int i = 0; i < 256; ++i) {
         EXPECT_EQ(g[i * 3 + 0], static_cast<std::uint8_t>(i));
         EXPECT_EQ(g[i * 3 + 1], static_cast<std::uint8_t>(i));
@@ -901,7 +901,7 @@ TEST(CmapGray, AllEntriesCorrect) {
 
 TEST(CmapGray, StablePointer) {
     // Repeated calls should return the same singleton object.
-    EXPECT_EQ(&cmap_gray(), &cmap_gray());
+    EXPECT_EQ(&tid::cmap_gray(), &tid::cmap_gray());
 }
 
 // ---------------------------------------------------------------------------
@@ -1022,9 +1022,9 @@ TEST(DefaultColormap, OptionsOverrideStillWorks) {
 // ---------------------------------------------------------------------------
 
 namespace {
-TerminalSize ts(size_t rows, size_t cols, bool valid = true,
+tid::TerminalSize ts(size_t rows, size_t cols, bool valid = true,
                 size_t width_px = 0, size_t height_px = 0) {
-    TerminalSize t;
+    tid::TerminalSize t;
     t.rows = rows;
     t.cols = cols;
     t.width_px = width_px;
@@ -1038,7 +1038,7 @@ TerminalSize ts(size_t rows, size_t cols, bool valid = true,
 TEST(Fit, InvalidTerminalIsNoop) {
     // With no usable terminal size, all modes are identity.
     for (Fit m : {Fit::Off, Fit::Resample, Fit::Trim}) {
-        FitResolution r = resolve_fit(100, 200, 1, m, ts(0, 0, false));
+        tid::FitResolution r = tid::resolve_fit(100, 200, 1, m, ts(0, 0, false));
         EXPECT_EQ(r.out_r, 100u);
         EXPECT_EQ(r.out_c, 200u);
         EXPECT_FALSE(r.resample);
@@ -1047,7 +1047,7 @@ TEST(Fit, InvalidTerminalIsNoop) {
 
 TEST(Fit, OffIgnoresTerminalSize) {
     // Even with a too-small terminal, Off leaves dimensions alone.
-    FitResolution r = resolve_fit(100, 200, 1, Fit::Off, ts(10, 20));
+    tid::FitResolution r = tid::resolve_fit(100, 200, 1, Fit::Off, ts(10, 20));
     EXPECT_EQ(r.out_r, 100u);
     EXPECT_EQ(r.out_c, 200u);
     EXPECT_FALSE(r.resample);
@@ -1055,7 +1055,7 @@ TEST(Fit, OffIgnoresTerminalSize) {
 
 TEST(Fit, FitsExactlyIsNoop) {
     // vr*bs = 20 pixel rows = 10 cells, vc*bs = 40 cells → fits exactly.
-    FitResolution r = resolve_fit(20, 40, 1, Fit::Resample, ts(10, 40));
+    tid::FitResolution r = tid::resolve_fit(20, 40, 1, Fit::Resample, ts(10, 40));
     EXPECT_EQ(r.out_r, 20u);
     EXPECT_EQ(r.out_c, 40u);
     EXPECT_FALSE(r.resample);
@@ -1064,7 +1064,7 @@ TEST(Fit, FitsExactlyIsNoop) {
 TEST(Fit, ResampleMatchingAspectScalesUniformly) {
     // Source 100×200 (vc:vr = 2:1), terminal pixel cap 40×20 (also 2:1).
     // Uniform scale of 1/5 on both axes → out_c=40, out_r=20.
-    FitResolution r = resolve_fit(100, 200, 1, Fit::Resample, ts(10, 40));
+    tid::FitResolution r = tid::resolve_fit(100, 200, 1, Fit::Resample, ts(10, 40));
     EXPECT_EQ(r.out_r, 20u);
     EXPECT_EQ(r.out_c, 40u);
     EXPECT_TRUE(r.resample);
@@ -1076,7 +1076,7 @@ TEST(Fit, ResamplePreservesAspectWhenOnlyWidthOverruns) {
     // axes by the width scale factor (40/200 = 1/5) → out_c=40, out_r=2.
     // Without the aspect fix, the old behavior would leave out_r=10 and
     // stretch the image vertically by 5x.
-    FitResolution r = resolve_fit(10, 200, 1, Fit::Resample, ts(50, 40));
+    tid::FitResolution r = tid::resolve_fit(10, 200, 1, Fit::Resample, ts(50, 40));
     EXPECT_EQ(r.out_c, 40u);
     EXPECT_EQ(r.out_r, 2u);
     EXPECT_EQ(r.out_c / r.out_r, 20u);  // aspect preserved
@@ -1087,7 +1087,7 @@ TEST(Fit, ResamplePreservesAspectWhenOnlyHeightOverruns) {
     // Mirror case: source 200×10 (tall & narrow, vc:vr = 1:20). Width fits
     // (10 ≤ 40), height overruns (200 > 2*10=20). Height scale = 20/200 = 1/10;
     // applied to both → out_r=20, out_c=1.
-    FitResolution r = resolve_fit(200, 10, 1, Fit::Resample, ts(10, 40));
+    tid::FitResolution r = tid::resolve_fit(200, 10, 1, Fit::Resample, ts(10, 40));
     EXPECT_EQ(r.out_r, 20u);
     EXPECT_EQ(r.out_c, 1u);
     EXPECT_EQ(r.out_r / r.out_c, 20u);  // aspect preserved
@@ -1097,7 +1097,7 @@ TEST(Fit, ResamplePreservesAspectWhenOnlyHeightOverruns) {
 TEST(Fit, ResamplePreservesSquareAspect) {
     // Square source (100×100). Terminal 20 cells × 20 cells → 20 pixel cols,
     // 40 pixel rows. Width is tighter. Uniform scale → out_c=20, out_r=20.
-    FitResolution r = resolve_fit(100, 100, 1, Fit::Resample, ts(20, 20));
+    tid::FitResolution r = tid::resolve_fit(100, 100, 1, Fit::Resample, ts(20, 20));
     EXPECT_EQ(r.out_c, 20u);
     EXPECT_EQ(r.out_r, 20u);  // square stays square
     EXPECT_TRUE(r.resample);
@@ -1108,7 +1108,7 @@ TEST(Fit, ResampleUsesDetectedTerminalPixelAspect) {
     // 100 rows in 2200px -> 22px-tall cells.
     // Half-block pixels are therefore 11/10 as tall as they are wide, so a
     // square source should render with fewer output rows.
-    FitResolution r = resolve_fit(100, 100, 1, Fit::Resample,
+    tid::FitResolution r = tid::resolve_fit(100, 100, 1, Fit::Resample,
                                   ts(100, 100, true, 1000, 2200));
     EXPECT_EQ(r.out_c, 100u);
     EXPECT_EQ(r.out_r, 91u);
@@ -1116,7 +1116,7 @@ TEST(Fit, ResampleUsesDetectedTerminalPixelAspect) {
 }
 
 TEST(Fit, PixelAspectFallsBackToSquareWhenPixelsAreUnavailable) {
-    FitResolution r = resolve_fit(100, 100, 1, Fit::Resample, ts(100, 100));
+    tid::FitResolution r = tid::resolve_fit(100, 100, 1, Fit::Resample, ts(100, 100));
     EXPECT_EQ(r.out_c, 100u);
     EXPECT_EQ(r.out_r, 100u);
     EXPECT_FALSE(r.resample);
@@ -1125,7 +1125,7 @@ TEST(Fit, PixelAspectFallsBackToSquareWhenPixelsAreUnavailable) {
 TEST(Fit, TrimFillsTerminalWithoutAspectConstraint) {
     // Trim is identity-sampled (no stretching possible), so it fills the
     // terminal with whatever top-left region fits — no aspect adjustment.
-    FitResolution r = resolve_fit(100, 200, 1, Fit::Trim, ts(10, 40));
+    tid::FitResolution r = tid::resolve_fit(100, 200, 1, Fit::Trim, ts(10, 40));
     EXPECT_EQ(r.out_r, 20u);
     EXPECT_EQ(r.out_c, 40u);
     EXPECT_FALSE(r.resample);
@@ -1135,7 +1135,7 @@ TEST(Fit, TrimDoesNotShrinkAxisThatFits) {
     // Source 10×200 fits vertically as-is; Trim should leave out_r=10 and
     // only clamp width. Resample with the same inputs would shrink height
     // for aspect — this test guards the divergence between the two modes.
-    FitResolution r = resolve_fit(10, 200, 1, Fit::Trim, ts(50, 40));
+    tid::FitResolution r = tid::resolve_fit(10, 200, 1, Fit::Trim, ts(50, 40));
     EXPECT_EQ(r.out_r, 10u);   // unchanged
     EXPECT_EQ(r.out_c, 40u);   // capped
     EXPECT_FALSE(r.resample);
@@ -1145,7 +1145,7 @@ TEST(Fit, BlockSizeScalesCaps) {
     // With bs=4, each output cell takes 4 pixel cols. Terminal 40 cols → 10 cells.
     // 100×200 source: width-limited scale → out_pcols=40, out_prows=40*100/200=20.
     // Divided by bs=4: out_c=10, out_r=5 (aspect preserved, was previously 10×50).
-    FitResolution r = resolve_fit(100, 200, 4, Fit::Resample, ts(100, 40));
+    tid::FitResolution r = tid::resolve_fit(100, 200, 4, Fit::Resample, ts(100, 40));
     EXPECT_EQ(r.out_c, 10u);
     EXPECT_EQ(r.out_r, 5u);
     EXPECT_TRUE(r.resample);
@@ -1153,40 +1153,40 @@ TEST(Fit, BlockSizeScalesCaps) {
 
 TEST(Fit, BlockSizeLargerThanTerminalClampsToOne) {
     // bs=100, terminal only 40 cols wide → can't even render one cell, clamp to 1.
-    FitResolution r = resolve_fit(100, 200, 100, Fit::Resample, ts(100, 40));
+    tid::FitResolution r = tid::resolve_fit(100, 200, 100, Fit::Resample, ts(100, 40));
     EXPECT_EQ(r.out_c, 1u);
     EXPECT_TRUE(r.resample);
 }
 
 TEST(Fit, AutoBlockSizeInvalidTerminalIsNoop) {
     Options opts;
-    EXPECT_EQ(resolve_effective_block_size(8, 8, opts, ts(0, 0, false)), 1u);
+    EXPECT_EQ(tid::resolve_effective_block_size(8, 8, opts, ts(0, 0, false)), 1u);
 }
 
 TEST(Fit, AutoBlockSizeRespectsExplicitBlockSize) {
     Options opts;
     opts.block_size(1);
-    EXPECT_EQ(resolve_effective_block_size(8, 8, opts, ts(24, 80)), 1u);
+    EXPECT_EQ(tid::resolve_effective_block_size(8, 8, opts, ts(24, 80)), 1u);
 
     opts.block_size(3);
-    EXPECT_EQ(resolve_effective_block_size(8, 8, opts, ts(24, 80)), 3u);
+    EXPECT_EQ(tid::resolve_effective_block_size(8, 8, opts, ts(24, 80)), 3u);
 }
 
 TEST(Fit, AutoBlockSizeUpscalesSmallImage) {
     Options opts;
-    EXPECT_EQ(resolve_effective_block_size(8, 8, opts, ts(24, 80)), 4u);
+    EXPECT_EQ(tid::resolve_effective_block_size(8, 8, opts, ts(24, 80)), 4u);
 }
 
 TEST(Fit, AutoBlockSizeNeverExceedsDisplay) {
     Options opts;
-    size_t bs = resolve_effective_block_size(5, 7, opts, ts(6, 20));
+    size_t bs = tid::resolve_effective_block_size(5, 7, opts, ts(6, 20));
 
     EXPECT_GT(bs, 1u);
     EXPECT_LE(7u * bs, 20u);
     // One terminal row is reserved for the default scalar colorbar.
     EXPECT_LE(5u * bs, (6u - 1u) * 2u);
 
-    FitResolution r = resolve_fit(5, 7, bs, Fit::Resample, ts(6, 20));
+    tid::FitResolution r = tid::resolve_fit(5, 7, bs, Fit::Resample, ts(6, 20));
     EXPECT_EQ(r.out_r, 5u);
     EXPECT_EQ(r.out_c, 7u);
     EXPECT_FALSE(r.resample);
@@ -1194,14 +1194,14 @@ TEST(Fit, AutoBlockSizeNeverExceedsDisplay) {
 
 TEST(Fit, AutoBlockSizeLeavesAlreadyTooLargeImageAtOne) {
     Options opts;
-    EXPECT_EQ(resolve_effective_block_size(100, 100, opts, ts(10, 40)), 1u);
+    EXPECT_EQ(tid::resolve_effective_block_size(100, 100, opts, ts(10, 40)), 1u);
 }
 
 TEST(Fit, AutoBlockSizeDoesNotEngageWhenBaseWouldResample) {
     // Half-block pixels are not square here, so Fit::Resample would adjust
     // output rows even at block_size=1. Auto block sizing should stay out of it.
     Options opts;
-    EXPECT_EQ(resolve_effective_block_size(10, 10, opts,
+    EXPECT_EQ(tid::resolve_effective_block_size(10, 10, opts,
         ts(50, 50, true, 500, 1100)), 1u);
 }
 
@@ -1213,7 +1213,7 @@ TEST(Clim, AutoClimScansWholeVisibleSourceRegion) {
     double lo = std::numeric_limits<double>::quiet_NaN();
     double hi = std::numeric_limits<double>::quiet_NaN();
 
-    apply_auto_clim(2, 3,
+    tid::apply_auto_clim(2, 3,
         [&](size_t r, size_t c) { return values[r * 3 + c]; },
         lo, hi, true, true);
 
@@ -1229,7 +1229,7 @@ TEST(Resampling, NearestUsesIntegerSourceCells) {
        12.0, 13.0, 14.0, 15.0
     };
 
-    double v = sample_resampled(1, 1, 2, 2, 4, 4,
+    double v = tid::sample_resampled(1, 1, 2, 2, 4, 4,
         [&](size_t r, size_t c) { return values[r * 4 + c]; },
         Resampling::Nearest);
 
@@ -1242,7 +1242,7 @@ TEST(Resampling, BilinearAveragesCenteredSourcePatch) {
         20.0, 30.0
     };
 
-    double v = sample_resampled(0, 0, 1, 1, 2, 2,
+    double v = tid::sample_resampled(0, 0, 1, 1, 2, 2,
         [&](size_t r, size_t c) { return values[r * 2 + c]; },
         Resampling::Bilinear);
 
@@ -1255,7 +1255,7 @@ TEST(Resampling, BilinearFallsBackToNearestAroundNonFiniteValues) {
         20.0, 30.0
     };
 
-    double v = sample_resampled(0, 0, 1, 1, 2, 2,
+    double v = tid::sample_resampled(0, 0, 1, 1, 2, 2,
         [&](size_t r, size_t c) { return values[r * 2 + c]; },
         Resampling::Bilinear);
 
@@ -1263,16 +1263,16 @@ TEST(Resampling, BilinearFallsBackToNearestAroundNonFiniteValues) {
 }
 
 TEST(Resampling, RgbBilinearInterpolatesEachChannel) {
-    RGB values[] = {
-        RGB{0, 0, 0},       RGB{100, 0, 0},
-        RGB{0, 100, 0},     RGB{0, 0, 100}
+    tid::RGB values[] = {
+        tid::RGB{0, 0, 0},       tid::RGB{100, 0, 0},
+        tid::RGB{0, 100, 0},     tid::RGB{0, 0, 100}
     };
 
-    RGB c = sample_rgb_resampled(0, 0, 1, 1, 2, 2,
+    tid::RGB c = tid::sample_rgb_resampled(0, 0, 1, 1, 2, 2,
         [&](size_t r, size_t col) { return values[r * 2 + col]; },
         Resampling::Bilinear);
 
-    EXPECT_EQ(c, (RGB{25, 25, 25}));
+    EXPECT_EQ(c, (tid::RGB{25, 25, 25}));
 }
 
 TEST(Fit, OstringstreamRendersIdenticallyAcrossModes) {
@@ -1324,19 +1324,19 @@ TEST(Title, SummaryIncludesCrop) {
     Options opts;
     opts.title().crop(1, 2, 3, 4).colormap("viridis");
 
-    EXPECT_EQ(render_title(opts, 10, 20, 2, 1, 4, 3, 4, 3, false),
+    EXPECT_EQ(tid::render_title(opts, 10, 20, 2, 1, 4, 3, 4, 3, false),
         "termimage: data=10x20 crop=(1,2 3x4) cmap=viridis");
 }
 
 TEST(Title, SummaryIncludesDisplayedSizeWhenResampledOrTrimmed) {
     Options resampled;
     resampled.title().colormap("magma");
-    EXPECT_EQ(render_title(resampled, 100, 200, 0, 0, 100, 200, 20, 40, true),
+    EXPECT_EQ(tid::render_title(resampled, 100, 200, 0, 0, 100, 200, 20, 40, true),
         "termimage: data=100x200 display=20x40 resampled cmap=magma");
 
     Options trimmed;
     trimmed.title().fit(Fit::Trim);
-    EXPECT_EQ(render_title(trimmed, 100, 200, 0, 0, 100, 200, 20, 40, false),
+    EXPECT_EQ(tid::render_title(trimmed, 100, 200, 0, 0, 100, 200, 20, 40, false),
         "termimage: data=100x200 display=20x40 trimmed cmap=gray");
 }
 
@@ -1344,7 +1344,7 @@ TEST(Title, RgbSummaryIncludesRgbLayout) {
     Options opts;
     opts.title("rgb frame").layout(Layout::ColMajor).block_size(2);
 
-    EXPECT_EQ(render_rgb_title(opts, "planar",
+    EXPECT_EQ(tid::render_rgb_title(opts, "planar",
             10, 20, 2, 1, 4, 3, 4, 3, false),
         "rgb frame: data=10x20 crop=(1,2 3x4) rgb=planar layout=col-major block=2");
 }

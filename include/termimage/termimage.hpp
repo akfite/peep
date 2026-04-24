@@ -93,7 +93,7 @@ public:
     size_t block_size() const { return block_size_; }
     bool has_block_size() const { return block_size_set_; }
     Layout layout() const { return layout_; }
-    std::ostream& ostream() const { return *out_; }
+    std::ostream& ostream() const { return out_.get(); }
     size_t crop_x() const { return crop_x_; }
     size_t crop_y() const { return crop_y_; }
     size_t crop_w() const { return crop_w_; }
@@ -194,7 +194,7 @@ public:
         return *this;
     }
     Options& layout(Layout l) { layout_ = l; return *this; }
-    Options& ostream(std::ostream& os) { out_ = &os; return *this; }
+    Options& ostream(std::ostream& os) { out_ = std::ref(os); return *this; }
 
     // Crop: from (x, y) to end of matrix.
     Options& crop(size_t x, size_t y) {
@@ -281,7 +281,7 @@ private:
     size_t block_size_;
     bool block_size_set_;
     Layout layout_;
-    std::ostream* out_;
+    std::reference_wrapper<std::ostream> out_;
     size_t crop_x_;
     size_t crop_y_;
     size_t crop_h_;
@@ -338,7 +338,7 @@ struct Pixel {
 // Computed grayscale colormap (avoids embedding trivial data)
 inline ColormapLut make_gray_lut() {
     ColormapLut lut;
-    for (int i = 0; i < 256; ++i) {
+    for (size_t i = 0; i < 256; ++i) {
         std::uint8_t v = static_cast<std::uint8_t>(i);
         lut[i * 3 + 0] = v;
         lut[i * 3 + 1] = v;
@@ -640,9 +640,16 @@ inline RenderPlan make_render_plan(size_t rows, size_t cols,
 }
 
 inline RGB lookup(double normalized, const ColormapLut& cmap) {
-    int idx = static_cast<int>(normalized * 255.0 + 0.5);
-    if (idx < 0) idx = 0;
-    if (idx > 255) idx = 255;
+    if (std::isnan(normalized)) normalized = 0.0;
+
+    const double scaled = normalized * 255.0 + 0.5;
+    size_t idx = 0;
+    if (scaled >= 255.0) {
+        idx = 255;
+    } else if (scaled > 0.0) {
+        idx = static_cast<size_t>(scaled);
+    }
+
     RGB c;
     c.r = cmap[idx * 3];
     c.g = cmap[idx * 3 + 1];
@@ -1264,7 +1271,7 @@ inline Options::Options()
       block_size_(1),
       block_size_set_(false),
       layout_(Layout::RowMajor),
-      out_(&std::cout),
+      out_(std::cout),
       crop_x_(0),
       crop_y_(0),
       crop_h_(0),
