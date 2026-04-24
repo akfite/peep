@@ -34,6 +34,7 @@ TEST(Options, DefaultValues) {
     EXPECT_EQ(opts.crop_h(), 0u);
     EXPECT_EQ(opts.crop_w(), 0u);
     EXPECT_EQ(opts.fit(), Fit::Resample);
+    EXPECT_EQ(opts.resampling(), Resampling::Bilinear);
     EXPECT_FALSE(opts.show_title());
     EXPECT_EQ(opts.title_text(), "");
 }
@@ -48,6 +49,7 @@ TEST(Options, ChainableSetters) {
                        .ostream(oss)
                        .crop(4, 5, 6, 7)
                        .fit(Fit::Trim)
+                       .resampling(Resampling::Nearest)
                        .title("demo");
 
     // Chaining must return the same object
@@ -64,6 +66,7 @@ TEST(Options, ChainableSetters) {
     EXPECT_EQ(opts.crop_h(), 6u);
     EXPECT_EQ(opts.crop_w(), 7u);
     EXPECT_EQ(opts.fit(), Fit::Trim);
+    EXPECT_EQ(opts.resampling(), Resampling::Nearest);
     EXPECT_TRUE(opts.show_title());
     EXPECT_EQ(opts.title_text(), "demo");
 }
@@ -892,6 +895,47 @@ TEST(Clim, AutoClimScansWholeVisibleSourceRegion) {
 
     EXPECT_DOUBLE_EQ(lo, 0.0);
     EXPECT_DOUBLE_EQ(hi, 100.0);
+}
+
+TEST(Resampling, NearestUsesIntegerSourceCells) {
+    double values[] = {
+        0.0,  1.0,  2.0,  3.0,
+        4.0,  5.0,  6.0,  7.0,
+        8.0,  9.0, 10.0, 11.0,
+       12.0, 13.0, 14.0, 15.0
+    };
+
+    double v = sample_resampled(1, 1, 2, 2, 4, 4,
+        [&](size_t r, size_t c) { return values[r * 4 + c]; },
+        Resampling::Nearest);
+
+    EXPECT_DOUBLE_EQ(v, 10.0);
+}
+
+TEST(Resampling, BilinearAveragesCenteredSourcePatch) {
+    double values[] = {
+        0.0, 10.0,
+        20.0, 30.0
+    };
+
+    double v = sample_resampled(0, 0, 1, 1, 2, 2,
+        [&](size_t r, size_t c) { return values[r * 2 + c]; },
+        Resampling::Bilinear);
+
+    EXPECT_DOUBLE_EQ(v, 15.0);
+}
+
+TEST(Resampling, BilinearFallsBackToNearestAroundNonFiniteValues) {
+    double values[] = {
+        0.0, std::numeric_limits<double>::infinity(),
+        20.0, 30.0
+    };
+
+    double v = sample_resampled(0, 0, 1, 1, 2, 2,
+        [&](size_t r, size_t c) { return values[r * 2 + c]; },
+        Resampling::Bilinear);
+
+    EXPECT_DOUBLE_EQ(v, 0.0);
 }
 
 TEST(Fit, OstringstreamRendersIdenticallyAcrossModes) {

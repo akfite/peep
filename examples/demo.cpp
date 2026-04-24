@@ -102,7 +102,7 @@ int main() {
 
     // 6. MATLAB peaks — oversized to demonstrate terminal auto-fit (resample).
     //    The source grid is much larger than any terminal; Fit::Resample
-    //    (the default) nearest-neighbor downsamples it to fit the window.
+    //    (the default) downsamples it with bilinear interpolation.
     std::cout << "=== MATLAB peaks (viridis, 1000x1000 resampled to fit) ===" << std::endl;
     {
         const int n = 1000;

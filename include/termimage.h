@@ -37,6 +37,7 @@ struct Color {
 };
 
 enum class Layout { RowMajor, ColMajor };
+enum class Resampling { Nearest, Bilinear };
 enum class Colormap {
     Gray,
     Magma,
@@ -51,13 +52,54 @@ enum class Colormap {
 
 // What to do when the rendered image would exceed the terminal window.
 //   Off      — render at full size (may wrap or scroll).
-//   Resample — nearest-neighbor downsample to fit the terminal.
+//   Resample — downsample to fit the terminal.
 //   Trim     — render the top-left portion that fits, discard the rest.
 // Only engages when the output stream is a terminal (stdout/stderr + isatty).
 // Otherwise behaves as Off, so to_string and piped output are unaffected.
 enum class Fit { Off, Resample, Trim };
 
 namespace detail {
+
+struct OptionalColor {
+    OptionalColor() : value(), set(false) {}
+
+    void assign(Color c) { value = c; set = true; }
+    void clear() { set = false; }
+
+    Color value;
+    bool set;
+};
+
+struct CustomColormap {
+    CustomColormap() : lut(), set(false) {}
+
+    void assign(const ColormapLut& src) {
+        lut = src;
+        set = true;
+    }
+
+    template <typename InputIt>
+    void assign(InputIt first, InputIt last) {
+        std::copy(first, last, lut.begin());
+        set = true;
+    }
+
+    void clear() { set = false; }
+    size_t size() const { return lut.size(); }
+
+    ColormapLut lut;
+    bool set;
+};
+
+struct TitleOptions {
+    TitleOptions() : show(false), text() {}
+
+    void enable(bool enabled = true) { show = enabled; }
+    void assign(const std::string& label) { show = true; text = label; }
+
+    bool show;
+    std::string text;
+};
 
 inline Colormap& default_colormap_ref() {
     static Colormap cmap = Colormap::Gray;
@@ -93,28 +135,26 @@ inline void set_default_colormap(Colormap c) { detail::default_colormap_ref() = 
 struct Options {
     Options()
         : clim_lo_(NAN), clim_hi_(NAN), colormap_(default_colormap()),
-        custom_cmap_(), has_custom_cmap_(false),
-        nan_color_(), has_nan_color_(false),
-        neg_inf_color_(), has_neg_inf_color_(false),
-        pos_inf_color_(), has_pos_inf_color_(false),
+        custom_cmap_(), nan_color_(), neg_inf_color_(), pos_inf_color_(),
         block_size_(1), layout_(Layout::RowMajor), out_(&std::cout),
         crop_r0_(0), crop_c0_(0), crop_h_(0), crop_w_(0),
-        fit_(Fit::Resample), title_(false), title_text_() {}
+        fit_(Fit::Resample), resampling_(Resampling::Bilinear),
+        title_() {}
 
     // Getters
     double clim_lo() const { return clim_lo_; }
     double clim_hi() const { return clim_hi_; }
     Colormap colormap() const { return colormap_; }
     const ColormapLut* custom_colormap() const {
-        return has_custom_cmap_ ? &custom_cmap_ : nullptr;
+        return custom_cmap_.set ? &custom_cmap_.lut : nullptr;
     }
-    bool has_custom_colormap() const { return has_custom_cmap_; }
-    Color nan_color() const { return nan_color_; }
-    bool has_nan_color() const { return has_nan_color_; }
-    Color neg_inf_color() const { return neg_inf_color_; }
-    bool has_neg_inf_color() const { return has_neg_inf_color_; }
-    Color pos_inf_color() const { return pos_inf_color_; }
-    bool has_pos_inf_color() const { return has_pos_inf_color_; }
+    bool has_custom_colormap() const { return custom_cmap_.set; }
+    Color nan_color() const { return nan_color_.value; }
+    bool has_nan_color() const { return nan_color_.set; }
+    Color neg_inf_color() const { return neg_inf_color_.value; }
+    bool has_neg_inf_color() const { return neg_inf_color_.set; }
+    Color pos_inf_color() const { return pos_inf_color_.value; }
+    bool has_pos_inf_color() const { return pos_inf_color_.set; }
     size_t block_size() const { return block_size_; }
     Layout layout() const { return layout_; }
     std::ostream& ostream() const { return *out_; }
@@ -123,79 +163,71 @@ struct Options {
     size_t crop_h() const { return crop_h_; }
     size_t crop_w() const { return crop_w_; }
     Fit fit() const { return fit_; }
-    bool show_title() const { return title_; }
-    const std::string& title_text() const { return title_text_; }
+    Resampling resampling() const { return resampling_; }
+    bool show_title() const { return title_.show; }
+    const std::string& title_text() const { return title_.text; }
 
     // Chainable setters
     Options& clim(double lo, double hi) { clim_lo_ = lo; clim_hi_ = hi; return *this; }
     Options& clim_lo(double v) { clim_lo_ = v; return *this; }
     Options& clim_hi(double v) { clim_hi_ = v; return *this; }
-    Options& colormap(Colormap c) { colormap_ = c; has_custom_cmap_ = false; return *this; }
+    Options& colormap(Colormap c) { colormap_ = c; custom_cmap_.clear(); return *this; }
     Options& colormap(const std::string& name) {
-        has_custom_cmap_ = false;
+        custom_cmap_.clear();
         colormap_ = detail::colormap_from_string(name);
         return *this;
     }
     // Custom colormap: 256 RGB triplets (768 bytes), copied for safe ownership.
     Options& colormap(const ColormapLut& lut) {
-        custom_cmap_ = lut;
-        has_custom_cmap_ = true;
+        custom_cmap_.assign(lut);
         return *this;
     }
     Options& colormap(const std::vector<std::uint8_t>& lut) {
         if (lut.size() != custom_cmap_.size()) {
             throw std::invalid_argument("termimage custom colormap must contain exactly 768 bytes");
         }
-        std::copy(lut.begin(), lut.end(), custom_cmap_.begin());
-        has_custom_cmap_ = true;
+        custom_cmap_.assign(lut.begin(), lut.end());
         return *this;
     }
     Options& colormap(const std::uint8_t (&lut)[768]) {
-        std::copy(lut, lut + custom_cmap_.size(), custom_cmap_.begin());
-        has_custom_cmap_ = true;
+        custom_cmap_.assign(lut, lut + custom_cmap_.size());
         return *this;
     }
-    Options& nan_color(Color c) { nan_color_ = c; has_nan_color_ = true; return *this; }
+    Options& nan_color(Color c) { nan_color_.assign(c); return *this; }
     Options& nan_color(std::uint8_t r, std::uint8_t g, std::uint8_t b) {
         return nan_color(Color{r, g, b});
     }
-    Options& clear_nan_color() { has_nan_color_ = false; return *this; }
+    Options& clear_nan_color() { nan_color_.clear(); return *this; }
     Options& inf_color(Color c) {
-        neg_inf_color_ = c;
-        pos_inf_color_ = c;
-        has_neg_inf_color_ = true;
-        has_pos_inf_color_ = true;
+        neg_inf_color_.assign(c);
+        pos_inf_color_.assign(c);
         return *this;
     }
     Options& inf_color(std::uint8_t r, std::uint8_t g, std::uint8_t b) {
         return inf_color(Color{r, g, b});
     }
     Options& inf_colors(Color neg, Color pos) {
-        neg_inf_color_ = neg;
-        pos_inf_color_ = pos;
-        has_neg_inf_color_ = true;
-        has_pos_inf_color_ = true;
+        neg_inf_color_.assign(neg);
+        pos_inf_color_.assign(pos);
         return *this;
     }
     Options& neg_inf_color(Color c) {
-        neg_inf_color_ = c;
-        has_neg_inf_color_ = true;
+        neg_inf_color_.assign(c);
         return *this;
     }
     Options& neg_inf_color(std::uint8_t r, std::uint8_t g, std::uint8_t b) {
         return neg_inf_color(Color{r, g, b});
     }
     Options& pos_inf_color(Color c) {
-        pos_inf_color_ = c;
-        has_pos_inf_color_ = true;
+        pos_inf_color_.assign(c);
         return *this;
     }
     Options& pos_inf_color(std::uint8_t r, std::uint8_t g, std::uint8_t b) {
         return pos_inf_color(Color{r, g, b});
     }
     Options& clear_inf_colors() {
-        has_neg_inf_color_ = false;
-        has_pos_inf_color_ = false;
+        neg_inf_color_.clear();
+        pos_inf_color_.clear();
         return *this;
     }
     Options& block_size(size_t s) { block_size_ = (s > 0) ? s : 1; return *this; }
@@ -215,15 +247,14 @@ struct Options {
         return *this;
     }
     Options& fit(Fit f) { fit_ = f; return *this; }
-    Options& title(bool enabled = true) { title_ = enabled; return *this; }
+    Options& resampling(Resampling r) { resampling_ = r; return *this; }
+    Options& title(bool enabled = true) { title_.enable(enabled); return *this; }
     Options& title(const std::string& text) {
-        title_ = true;
-        title_text_ = text;
+        title_.assign(text);
         return *this;
     }
     Options& title(const char* text) {
-        title_ = true;
-        title_text_ = text ? text : "";
+        title_.assign(text ? text : "");
         return *this;
     }
 
@@ -231,14 +262,10 @@ private:
     double clim_lo_;
     double clim_hi_;
     Colormap colormap_;
-    ColormapLut custom_cmap_;
-    bool has_custom_cmap_;
-    Color nan_color_;
-    bool has_nan_color_;
-    Color neg_inf_color_;
-    bool has_neg_inf_color_;
-    Color pos_inf_color_;
-    bool has_pos_inf_color_;
+    detail::CustomColormap custom_cmap_;
+    detail::OptionalColor nan_color_;
+    detail::OptionalColor neg_inf_color_;
+    detail::OptionalColor pos_inf_color_;
     size_t block_size_;
     Layout layout_;
     std::ostream* out_;
@@ -247,8 +274,8 @@ private:
     size_t crop_h_;
     size_t crop_w_;
     Fit fit_;
-    bool title_;
-    std::string title_text_;
+    Resampling resampling_;
+    detail::TitleOptions title_;
 };
 
 // public API
@@ -480,6 +507,69 @@ inline void apply_auto_clim(size_t rows, size_t cols, Get get,
     if (auto_hi) hi = fhi;
 }
 
+inline double resample_coord(size_t out_i, size_t out_n, size_t in_n) {
+    if (in_n <= 1 || out_n == 0) return 0.0;
+    // Center-aligned mapping keeps downsampled pixels representative of the
+    // source area they cover instead of always sampling from the upper-left.
+    double coord = ((static_cast<double>(out_i) + 0.5)
+                    * static_cast<double>(in_n)
+                    / static_cast<double>(out_n)) - 0.5;
+    const double max_coord = static_cast<double>(in_n - 1);
+    if (coord < 0.0) coord = 0.0;
+    if (coord > max_coord) coord = max_coord;
+    return coord;
+}
+
+template <typename Get>
+inline double sample_nearest(size_t mr, size_t mc, size_t out_r, size_t out_c,
+                             size_t src_r, size_t src_c, Get get) {
+    size_t sr = (mr * src_r) / out_r;
+    size_t sc = (mc * src_c) / out_c;
+    return get(sr, sc);
+}
+
+template <typename Get>
+inline double sample_bilinear(size_t mr, size_t mc, size_t out_r, size_t out_c,
+                              size_t src_r, size_t src_c, Get get) {
+    const double r = resample_coord(mr, out_r, src_r);
+    const double c = resample_coord(mc, out_c, src_c);
+    const size_t r0 = static_cast<size_t>(std::floor(r));
+    const size_t c0 = static_cast<size_t>(std::floor(c));
+    const size_t r1 = std::min(r0 + 1, src_r - 1);
+    const size_t c1 = std::min(c0 + 1, src_c - 1);
+    const double wr = r - static_cast<double>(r0);
+    const double wc = c - static_cast<double>(c0);
+
+    const double v00 = get(r0, c0);
+    const double v01 = get(r0, c1);
+    const double v10 = get(r1, c0);
+    const double v11 = get(r1, c1);
+    const double w00 = (1.0 - wr) * (1.0 - wc);
+    const double w01 = (1.0 - wr) * wc;
+    const double w10 = wr * (1.0 - wc);
+    const double w11 = wr * wc;
+
+    // Preserve NaN/Inf semantics rather than blending or spreading them.
+    if ((w00 > 0.0 && !std::isfinite(v00))
+        || (w01 > 0.0 && !std::isfinite(v01))
+        || (w10 > 0.0 && !std::isfinite(v10))
+        || (w11 > 0.0 && !std::isfinite(v11))) {
+        return sample_nearest(mr, mc, out_r, out_c, src_r, src_c, get);
+    }
+
+    return v00 * w00 + v01 * w01 + v10 * w10 + v11 * w11;
+}
+
+template <typename Get>
+inline double sample_resampled(size_t mr, size_t mc, size_t out_r, size_t out_c,
+                               size_t src_r, size_t src_c, Get get,
+                               Resampling resampling) {
+    if (resampling == Resampling::Nearest) {
+        return sample_nearest(mr, mc, out_r, out_c, src_r, src_c, get);
+    }
+    return sample_bilinear(mr, mc, out_r, out_c, src_r, src_c, get);
+}
+
 template <typename T>
 void render(const T* data, size_t rows, size_t cols, const Options& opts) {
     if (!data || rows == 0 || cols == 0) return;
@@ -518,9 +608,9 @@ void render(const T* data, size_t rows, size_t cols, const Options& opts) {
             return static_cast<double>(data[(r0 + sr) * cols + (c0 + sc)]);
     };
     auto get = [&](size_t mr, size_t mc) -> double {
-        size_t sr = resample ? (mr * vr) / out_r : mr;
-        size_t sc = resample ? (mc * vc) / out_c : mc;
-        return get_source(sr, sc);
+        if (!resample) return get_source(mr, mc);
+        return sample_resampled(mr, mc, out_r, out_c, vr, vc,
+                                get_source, opts.resampling());
     };
 
     // Compute clim from visible region only

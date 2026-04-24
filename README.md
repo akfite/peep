@@ -100,21 +100,25 @@ All setters are chainable and return `Options&`.
 | `.crop(r0, c0)` | `.crop_r0()` / `.crop_c0()` | Crop from `(r0, c0)` to end of matrix. |
 | `.crop(r0, c0, h, w)` | `.crop_h()` / `.crop_w()` | Crop a `h × w` subregion starting at `(r0, c0)`. |
 | `.fit(Fit)` | `.fit()` | Behavior when the image exceeds the terminal. Default: `Fit::Resample`. |
+| `.resampling(Resampling)` | `.resampling()` | Strategy used by `Fit::Resample`: `Resampling::Bilinear` (default) or `Resampling::Nearest`. |
 | `.title()` / `.title("label")` | `.show_title()` / `.title_text()` | Prepend a concise info line with data size, crop, display size when resized, colormap, and non-default layout/block size. Default: off. |
 
 ### Enums
 
 ```cpp
 enum class Layout   { RowMajor, ColMajor };
+enum class Resampling { Nearest, Bilinear };
 enum class Colormap {
     Gray, Magma, Viridis, Plasma, Inferno, Cividis, Coolwarm, Gnuplot, Turbo
 };
 enum class Fit      { Off, Resample, Trim };
 ```
 
-`Fit::Resample` (default) nearest-neighbor downsamples oversized images to fit,
+`Fit::Resample` (default) downsamples oversized images to fit,
 using a single uniform scale factor so the source aspect ratio is preserved —
 a square matrix stays square, a `10 × 200` waveform stays wide and thin.
+The resampling strategy defaults to bilinear interpolation; use
+`.resampling(Resampling::Nearest)` for nearest-neighbor sampling.
 `Fit::Trim` renders the top-left portion that fits and discards the rest
 (identity-sampled, so the rendered pixels are 1:1 with the source).
 `Fit::Off` always renders at full size, letting the terminal wrap or scroll.
