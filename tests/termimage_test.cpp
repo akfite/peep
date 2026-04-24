@@ -1234,12 +1234,20 @@ TEST(Fit, AutoBlockSizeLeavesAlreadyTooLargeImageAtOne) {
     EXPECT_EQ(tid::resolve_effective_block_size(100, 100, opts, ts(10, 40)), 1u);
 }
 
-TEST(Fit, AutoBlockSizeDoesNotEngageWhenBaseWouldResample) {
-    // Half-block pixels are not square here, so Fit::Resample would adjust
-    // output rows even at block_size=1. Auto block sizing should stay out of it.
+TEST(Fit, AutoBlockSizeIgnoresAspectOnlyResample) {
+    // Half-block pixels are not square here, so Fit::Resample will adjust
+    // output rows. That should not suppress auto-enlargement for a small image.
     Options opts;
     EXPECT_EQ(tid::resolve_effective_block_size(10, 10, opts,
-        ts(50, 50, true, 500, 1100)), 1u);
+        ts(50, 50, true, 500, 1100)), 4u);
+}
+
+TEST(Fit, AutoBlockSizeUpscalesCenterCropWithTerminalPixels) {
+    Options opts;
+    opts.title().center_crop(4, 4, 6, 4);
+
+    EXPECT_EQ(tid::resolve_effective_block_size(4, 6, opts,
+        ts(24, 80, true, 640, 480)), 8u);
 }
 
 TEST(Clim, AutoClimScansWholeVisibleSourceRegion) {

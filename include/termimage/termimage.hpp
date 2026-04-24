@@ -600,14 +600,6 @@ inline size_t resolve_effective_block_size(size_t vr, size_t vc,
         return requested;
     }
 
-    // If the unscaled image would already be resampled/trimmed, do not make
-    // that worse by enlarging it. This also leaves terminal pixel-aspect
-    // correction alone when Fit::Resample chooses to adjust output rows.
-    const FitResolution base_fit = resolve_fit(vr, vc, requested, opts.fit(), ts);
-    if (base_fit.out_r != vr || base_fit.out_c != vc || base_fit.resample) {
-        return requested;
-    }
-
     const size_t reserved_rows = terminal_rows_reserved_for_chrome(opts);
     if (ts.rows <= reserved_rows || ts.cols == 0) return requested;
 
