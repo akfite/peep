@@ -43,9 +43,9 @@ int main() {
     // 2. Square 2D Gaussian (magma, block_size=2)
     std::cout << "=== 2D Gaussian (magma, block_size=2) ===" << std::endl;
     {
-        const int n = 24;
+        const int n = 25;
         std::vector<double> gauss(n * n);
-        double center = n / 2.0;
+        double center = (n - 1) / 2.0;
         double sigma = n / 5.0;
         for (int r = 0; r < n; ++r)
             for (int c = 0; c < n; ++c)
