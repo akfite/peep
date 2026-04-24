@@ -64,6 +64,19 @@ cmake -S . -B build -DTERMIMAGE_BUILD_EXAMPLES=OFF
 cmake -S . -B build -DTERMIMAGE_BUILD_TESTS=ON
 ```
 
+### Installing
+
+```bash
+cmake --install build --prefix /path/to/install
+```
+
+Installed CMake packages can be consumed with:
+
+```cmake
+find_package(termimage CONFIG REQUIRED)
+target_link_libraries(my_target PRIVATE termimage::termimage)
+```
+
 ### Running the Demo
 
 ```bash
@@ -78,6 +91,14 @@ Tests use [GoogleTest](https://github.com/google/googletest) (fetched automatica
 cmake -S . -B build -DTERMIMAGE_BUILD_TESTS=ON
 cmake --build build
 ctest --test-dir build
+```
+
+### Running Benchmarks
+
+```bash
+cmake -S . -B build -DTERMIMAGE_BUILD_BENCH=ON
+cmake --build build
+./build/bench
 ```
 
 ## API Reference

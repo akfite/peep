@@ -1,36 +1,61 @@
 cmake_minimum_required(VERSION 3.14)
-project(termimage LANGUAGES CXX)
+project(termimage VERSION 0.1.0 LANGUAGES CXX)
 
-# --- Header-only library target ----------------------------------------------
+include(CMakePackageConfigHelpers)
+include(GNUInstallDirs)
+
+if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    set(TERMIMAGE_IS_TOP_LEVEL ON)
+else()
+    set(TERMIMAGE_IS_TOP_LEVEL OFF)
+endif()
+
 add_library(termimage INTERFACE)
+add_library(termimage::termimage ALIAS termimage)
 target_include_directories(termimage INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_compile_features(termimage INTERFACE cxx_std_11)
 
-# --- Install -----------------------------------------------------------------
-install(TARGETS termimage EXPORT termimageTargets)
-install(DIRECTORY include/ DESTINATION include)
+install(TARGETS termimage
+    EXPORT termimageTargets
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(EXPORT termimageTargets
-    FILE termimageConfig.cmake
+    FILE termimageTargets.cmake
     NAMESPACE termimage::
-    DESTINATION lib/cmake/termimage
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/termimage
 )
 
-# --- Examples ----------------------------------------------------------------
-option(TERMIMAGE_BUILD_EXAMPLES "Build example programs" ON)
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/termimageConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/termimageConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/termimage
+)
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/termimageConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/termimageConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/termimageConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/termimage
+)
+
+option(TERMIMAGE_BUILD_EXAMPLES "Build example programs" ${TERMIMAGE_IS_TOP_LEVEL})
 
 if(TERMIMAGE_BUILD_EXAMPLES)
     add_executable(demo examples/demo.cpp)
     target_link_libraries(demo PRIVATE termimage)
 endif()
 
-# --- Benchmarks --------------------------------------------------------------
 option(TERMIMAGE_BUILD_BENCH "Build performance benchmark" OFF)
 
 if(TERMIMAGE_BUILD_BENCH)
-    add_executable(bench tests/bench.cpp)
+    add_executable(bench benchmarks/bench.cpp)
     target_link_libraries(bench PRIVATE termimage)
     target_compile_features(bench PRIVATE cxx_std_11)
     if(MSVC)
@@ -40,7 +65,6 @@ if(TERMIMAGE_BUILD_BENCH)
     endif()
 endif()
 
-# --- Tests -------------------------------------------------------------------
 option(TERMIMAGE_BUILD_TESTS "Build unit tests" OFF)
 
 if(TERMIMAGE_BUILD_TESTS)
@@ -53,6 +77,8 @@ if(TERMIMAGE_BUILD_TESTS)
     )
     # Prevent GoogleTest from overriding our compiler/linker options
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    # Keep termimage installs focused on termimage, even from test-enabled builds.
+    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(googletest)
 
     enable_testing()
