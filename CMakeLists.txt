@@ -50,6 +50,12 @@ option(TERMIMAGE_BUILD_EXAMPLES "Build example programs" ${TERMIMAGE_IS_TOP_LEVE
 if(TERMIMAGE_BUILD_EXAMPLES)
     add_executable(demo examples/demo.cpp)
     target_link_libraries(demo PRIVATE termimage)
+
+    add_executable(ppm_demo examples/ppm_demo.cpp)
+    target_link_libraries(ppm_demo PRIVATE termimage)
+    target_compile_definitions(ppm_demo PRIVATE
+        TERMIMAGE_PPM_DEMO_PATH="${CMAKE_CURRENT_SOURCE_DIR}/assets/cat.ppm"
+    )
 endif()
 
 option(TERMIMAGE_BUILD_BENCH "Build performance benchmark" OFF)
