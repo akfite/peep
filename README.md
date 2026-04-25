@@ -45,7 +45,7 @@ Sometimes importing a real graphics library is impractical or just more work tha
 
 ## Quickstart
 
-### 2-dimensional data
+### Two-dimensional data
 
 ```cpp
 #include <termimage/termimage.hpp>
@@ -178,7 +178,7 @@ termimage::Options().center_crop(128, 96, 80, 60); // center pix, w, h
 
 Crop windows can extend outside the source image. Out-of-bounds scalar pixels render as NaN. Out-of-bounds RGB pixels render as black. This makes fixed-size chips easy to request even near image borders.
 
-### Deal with NaN and Infinity
+### Deal with NaN and infinity
 
 NaNs are transparent by default, which is often (but not always) what you want for masks and missing data.  If you're hunting for NaNs or Infs, you can set a special color:
 
@@ -200,7 +200,7 @@ termimage::Options().layout(termimage::Layout::RowMajor);
 termimage::Options().layout(termimage::Layout::ColMajor);
 ```
 
-### Capture Instead of Printing
+### Capture instead of printing
 
 ```cpp
 std::string ansi = termimage::to_string(data, rows, cols,
@@ -209,7 +209,7 @@ std::string ansi = termimage::to_string(data, rows, cols,
 
 This is handy for tests, logs, or writing to a different stream yourself.
 
-## Printing a Real Image
+## Printing a real image
 
 `termimage` does not load PNG/JPEG/etc. `termimage` prints buffers.
 
@@ -233,7 +233,7 @@ termimage::print(image.rgb, image.height, image.width,
 
 Use whatever image loader you already have, fill a `std::vector<std::uint8_t>`, and hand it to `termimage`.
 
-## More Examples
+## More examples
 
 ```bash
 ./build/demo
