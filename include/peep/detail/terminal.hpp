@@ -1,7 +1,7 @@
-// Platform-specific terminal size query, kept out of the core header so
+// Platform-specific terminal size query, kept out of the public facade so
 // peep.hpp stays free of <windows.h>/<sys/ioctl.h>.
-#ifndef PEEP_TERMINAL_HPP
-#define PEEP_TERMINAL_HPP
+#ifndef PEEP_DETAIL_TERMINAL_HPP
+#define PEEP_DETAIL_TERMINAL_HPP
 
 #include <cstddef>
 #include <iostream>
@@ -95,4 +95,4 @@ inline TerminalSize query_terminal_size(const std::ostream& os) {
 } // namespace detail
 } // namespace peep
 
-#endif // PEEP_TERMINAL_HPP
+#endif // PEEP_DETAIL_TERMINAL_HPP

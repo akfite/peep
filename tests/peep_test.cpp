@@ -1489,6 +1489,40 @@ TEST(Fit, AutoBlockSizeUpscalesCenterCropWithTerminalPixels) {
         ts(24, 80, true, 640, 480)), 8u);
 }
 
+TEST(Fit, ViewportBudgetReservesScalarDecoratorRows) {
+    Options opts;
+    opts.title();
+
+    tid::ViewportBudget budget = tid::make_viewport_budget(ts(6, 20), opts);
+
+    EXPECT_TRUE(budget.valid);
+    EXPECT_EQ(budget.rows, 4u);
+    EXPECT_EQ(budget.cols, 20u);
+}
+
+TEST(Fit, ViewportBudgetDoesNotReserveRgbColorbarRow) {
+    Options opts;
+    opts.rgb().title().colorbar();
+
+    tid::ViewportBudget budget = tid::make_viewport_budget(ts(6, 20), opts);
+
+    EXPECT_TRUE(budget.valid);
+    EXPECT_EQ(budget.rows, 5u);
+    EXPECT_EQ(budget.cols, 20u);
+}
+
+TEST(Fit, ResolveFitUsesViewportBudgetBodyRows) {
+    Options opts;
+    opts.title();
+    tid::ViewportBudget budget = tid::make_viewport_budget(ts(6, 10), opts);
+
+    tid::FitResolution r = tid::resolve_fit(10, 10, 1, Fit::Trim, budget);
+
+    EXPECT_EQ(r.out_r, 8u);
+    EXPECT_EQ(r.out_c, 10u);
+    EXPECT_FALSE(r.resample);
+}
+
 TEST(Clim, AutoClimScansWholeVisibleSourceRegion) {
     double values[] = {
         0.0, 100.0, 1.0,
@@ -1557,6 +1591,39 @@ TEST(Resampling, RgbBilinearInterpolatesEachChannel) {
         Resampling::Bilinear);
 
     EXPECT_EQ(c, (tid::RGB{25, 25, 25}));
+}
+
+TEST(Resampling, PixelBilinearInterpolatesOpaqueColors) {
+    tid::Pixel values[] = {
+        tid::opaque_pixel(tid::RGB{0, 0, 0}),
+        tid::opaque_pixel(tid::RGB{100, 0, 0}),
+        tid::opaque_pixel(tid::RGB{0, 100, 0}),
+        tid::opaque_pixel(tid::RGB{0, 0, 100})
+    };
+
+    tid::Pixel p = tid::sample_pixel_resampled(0, 0, 1, 1, 2, 2,
+        [&](size_t r, size_t col) { return values[r * 2 + col]; },
+        Resampling::Bilinear);
+
+    EXPECT_FALSE(p.transparent);
+    EXPECT_FALSE(p.force_nearest);
+    EXPECT_EQ(p.color, (tid::RGB{25, 25, 25}));
+}
+
+TEST(Resampling, PixelBilinearFallsBackToNearestAroundTransparentPixels) {
+    tid::Pixel values[] = {
+        tid::opaque_pixel(tid::RGB{9, 8, 7}),
+        tid::transparent_pixel(),
+        tid::opaque_pixel(tid::RGB{0, 100, 0}),
+        tid::opaque_pixel(tid::RGB{0, 0, 100})
+    };
+
+    tid::Pixel p = tid::sample_pixel_resampled(0, 0, 1, 1, 2, 2,
+        [&](size_t r, size_t col) { return values[r * 2 + col]; },
+        Resampling::Bilinear);
+
+    EXPECT_FALSE(p.transparent);
+    EXPECT_EQ(p.color, (tid::RGB{9, 8, 7}));
 }
 
 TEST(Fit, OstringstreamRendersIdenticallyAcrossModes) {
