@@ -21,7 +21,7 @@ enum class RenderTitleKind {
 
 struct RenderDecorators {
     RenderTitleKind title_kind;
-    const char* rgb_source;
+    std::string rgb_source;
     const ColormapLut* colorbar_cmap;
     double colorbar_lo;
     double colorbar_hi;
@@ -125,7 +125,7 @@ void render_scalar_source(size_t rows, size_t cols, GetSource get_source_abs,
 
     RenderDecorators decorators;
     decorators.title_kind = RenderTitleKind::Scalar;
-    decorators.rgb_source = "";
+    decorators.rgb_source.clear();
     decorators.colorbar_cmap = &cmap;
     decorators.colorbar_lo = lo;
     decorators.colorbar_hi = hi;
@@ -149,7 +149,7 @@ void render(const T* data, size_t rows, size_t cols, const Options& opts) {
 
 template <typename GetSource>
 void render_rgb_source(size_t rows, size_t cols, GetSource get_source_abs,
-                       const char* rgb_source, const Options& opts) {
+                       const std::string& rgb_source, const Options& opts) {
     std::ostream& os = opts.ostream();
 
     RenderPlan plan = make_render_plan(rows, cols, opts, os);
@@ -230,7 +230,7 @@ inline void render_from_options(size_t rows, size_t cols, const Options& opts) {
         if (!opts.has_rgb_accessor()) {
             throw std::invalid_argument("peep RGB accessor is required for print(rows, cols, opts)");
         }
-        render_rgb_source(rows, cols, opts.rgb_accessor(), "accessor", opts);
+        render_rgb_source(rows, cols, opts.rgb_accessor(), std::string("accessor"), opts);
         return;
     }
     if (!opts.has_accessor()) {

@@ -3,8 +3,8 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -23,7 +23,7 @@ struct BenchResult {
     std::string name;
     size_t rows;
     size_t cols;
-    int iterations;
+    size_t iterations;
     double total_ms;
     size_t output_bytes;
 
@@ -114,7 +114,7 @@ static std::vector<std::uint8_t> interleaved_to_planar(
 static BenchResult run_bench(const std::string& name,
                               const double* data, size_t rows, size_t cols,
                               const peep::Options& base_opts,
-                              int iterations,
+                              size_t iterations,
                               OutputMode mode = OutputMode::Buffer) {
     // Warmup
     {
@@ -132,7 +132,7 @@ static BenchResult run_bench(const std::string& name,
     else opts.ostream(std::cout);
 
     auto t0 = Clock::now();
-    for (int i = 0; i < iterations; ++i) {
+    for (size_t i = 0; i < iterations; ++i) {
         if (mode == OutputMode::Buffer) {
             sink.str("");
             sink.clear();
@@ -160,7 +160,7 @@ static BenchResult run_rgb_bench(const std::string& name,
                                  const std::uint8_t* data, size_t rows, size_t cols,
                                  peep::RGBLayout rgb_layout,
                                  const peep::Options& base_opts,
-                                 int iterations,
+                                 size_t iterations,
                                  OutputMode mode = OutputMode::Buffer) {
     // Warmup
     {
@@ -180,7 +180,7 @@ static BenchResult run_rgb_bench(const std::string& name,
     else opts.ostream(std::cout);
 
     auto t0 = Clock::now();
-    for (int i = 0; i < iterations; ++i) {
+    for (size_t i = 0; i < iterations; ++i) {
         if (mode == OutputMode::Buffer) {
             sink.str("");
             sink.clear();
@@ -210,24 +210,24 @@ static BenchResult run_rgb_bench(const std::string& name,
 
 int main(int argc, char** argv) {
     OutputMode mode = OutputMode::Buffer;
-    for (int i = 1; i < argc; ++i) {
-        if (std::strcmp(argv[i], "--terminal") == 0) {
+    std::vector<std::string> args(argv + 1, argv + argc);
+    for (const auto& arg : args) {
+        if (arg == "--terminal") {
             mode = OutputMode::Terminal;
-        } else if (std::strcmp(argv[i], "--help") == 0
-                   || std::strcmp(argv[i], "-h") == 0) {
+        } else if (arg == "--help" || arg == "-h") {
             std::cout << "usage: bench [--terminal]\n\n"
                       << "default: render to an ostringstream for stable renderer metrics\n"
                       << "--terminal: write frames to stdout for noisy end-to-end terminal metrics\n";
             return 0;
         } else {
-            std::cerr << "unknown argument: " << argv[i] << '\n'
+            std::cerr << "unknown argument: " << arg << '\n'
                       << "usage: bench [--terminal]\n";
             return 1;
         }
     }
 
-    auto iters = [&](int n) {
-        return (mode == OutputMode::Terminal) ? std::min(n, 3) : n;
+    auto iters = [&](size_t n) {
+        return (mode == OutputMode::Terminal) ? std::min<size_t>(n, 3) : n;
     };
 
     if (mode == OutputMode::Terminal) {

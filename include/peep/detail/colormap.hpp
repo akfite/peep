@@ -42,7 +42,7 @@ inline const ColormapLut& cmap_gray() {
 
 struct ColormapEntry {
     Colormap id;
-    const char* name;
+    std::string name;
     const ColormapLut* lut;
 };
 
@@ -87,7 +87,7 @@ inline const ColormapLut& find_colormap(const std::string& name) {
     return find_colormap(colormap_from_string(name));
 }
 
-inline const char* colormap_name(Colormap cmap) {
+inline std::string colormap_name(Colormap cmap) {
     size_t count = 0;
     const ColormapEntry* entries = colormap_entries(count);
     for (size_t i = 0; i < count; ++i) {

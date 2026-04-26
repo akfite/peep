@@ -87,11 +87,11 @@ inline std::string render_title(const Options& opts, size_t rows, size_t cols,
     return ss.str();
 }
 
-inline const char* rgb_layout_name(RGBLayout layout) {
+inline std::string rgb_layout_name(RGBLayout layout) {
     return (layout == RGBLayout::Planar) ? "planar" : "interleaved";
 }
 
-inline std::string render_rgb_title(const Options& opts, const char* rgb_source,
+inline std::string render_rgb_title(const Options& opts, const std::string& rgb_source,
                                     size_t rows, size_t cols,
                                     std::ptrdiff_t r0, std::ptrdiff_t c0,
                                     size_t vr, size_t vc,

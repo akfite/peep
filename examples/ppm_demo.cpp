@@ -1,7 +1,6 @@
 #include <peep/peep.hpp>
 
 #include <cstdint>
-#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -32,14 +31,15 @@ static std::string next_token(std::istream& in) {
     throw std::runtime_error("unexpected end of PPM file");
 }
 
-static int next_int(std::istream& in) {
-    return std::atoi(next_token(in).c_str());
+static std::int32_t next_int(std::istream& in) {
+    return static_cast<std::int32_t>(std::stoi(next_token(in)));
 }
 
-static std::uint8_t scale_channel(int v, int max_value) {
+static std::uint8_t scale_channel(std::int32_t v, std::int32_t max_value) {
     if (v < 0) v = 0;
     if (v > max_value) v = max_value;
-    const long scaled = (static_cast<long>(v) * 255L + max_value / 2) / max_value;
+    const std::int64_t scaled =
+        (static_cast<std::int64_t>(v) * 255 + max_value / 2) / max_value;
     return static_cast<std::uint8_t>(scaled);
 }
 
@@ -51,9 +51,9 @@ static Image load_ascii_ppm(const std::string& path) {
         throw std::runtime_error("expected an ASCII PPM (P3) file");
     }
 
-    const int width = next_int(in);
-    const int height = next_int(in);
-    const int max_value = next_int(in);
+    const std::int32_t width = next_int(in);
+    const std::int32_t height = next_int(in);
+    const std::int32_t max_value = next_int(in);
     if (width <= 0 || height <= 0 || max_value <= 0) {
         throw std::runtime_error("invalid PPM header");
     }

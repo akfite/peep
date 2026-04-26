@@ -2,6 +2,7 @@
 #define PEEP_DETAIL_ANSI_HPP
 
 #include <cstddef>
+#include <cstdint>
 #include <ostream>
 #include <sstream>
 #include <vector>
@@ -11,16 +12,16 @@ namespace detail {
 
 inline void emit_bg(std::ostream& os, RGB c) {
     os << "\x1b[48;2;"
-        << static_cast<int>(c.r) << ';'
-        << static_cast<int>(c.g) << ';'
-        << static_cast<int>(c.b) << 'm';
+        << static_cast<std::uint16_t>(c.r) << ';'
+        << static_cast<std::uint16_t>(c.g) << ';'
+        << static_cast<std::uint16_t>(c.b) << 'm';
 }
 
 inline void emit_fg(std::ostream& os, RGB c) {
     os << "\x1b[38;2;"
-        << static_cast<int>(c.r) << ';'
-        << static_cast<int>(c.g) << ';'
-        << static_cast<int>(c.b) << 'm';
+        << static_cast<std::uint16_t>(c.r) << ';'
+        << static_cast<std::uint16_t>(c.g) << ';'
+        << static_cast<std::uint16_t>(c.b) << 'm';
 }
 
 inline void emit_reset(std::ostream& os) { os << "\x1b[0m"; }
