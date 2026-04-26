@@ -1,4 +1,4 @@
-#include <termimage/termimage.hpp>
+#include <peep/peep.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -12,19 +12,19 @@ int main() {
     {
         struct ColormapDemo {
             const char* name;
-            termimage::Colormap colormap;
+            peep::Colormap colormap;
         };
 
         const ColormapDemo colormaps[] = {
-            {"gray", termimage::Colormap::Gray},
-            {"viridis", termimage::Colormap::Viridis},
-            {"plasma", termimage::Colormap::Plasma},
-            {"inferno", termimage::Colormap::Inferno},
-            {"magma", termimage::Colormap::Magma},
-            {"cividis", termimage::Colormap::Cividis},
-            {"coolwarm", termimage::Colormap::Coolwarm},
-            {"gnuplot", termimage::Colormap::Gnuplot},
-            {"turbo", termimage::Colormap::Turbo},
+            {"gray", peep::Colormap::Gray},
+            {"viridis", peep::Colormap::Viridis},
+            {"plasma", peep::Colormap::Plasma},
+            {"inferno", peep::Colormap::Inferno},
+            {"magma", peep::Colormap::Magma},
+            {"cividis", peep::Colormap::Cividis},
+            {"coolwarm", peep::Colormap::Coolwarm},
+            {"gnuplot", peep::Colormap::Gnuplot},
+            {"turbo", peep::Colormap::Turbo},
         };
 
         const int cols = 64;
@@ -33,8 +33,8 @@ int main() {
             grad[c] = static_cast<double>(c) / (cols - 1);
 
         for (size_t i = 0; i < sizeof(colormaps) / sizeof(colormaps[0]); ++i) {
-            termimage::print(grad, 1, cols,
-                termimage::Options().colormap(colormaps[i].colormap)
+            peep::print(grad, 1, cols,
+                peep::Options().colormap(colormaps[i].colormap)
                                     .title(colormaps[i].name)
                                     .colorbar(false));
         }
@@ -72,10 +72,10 @@ int main() {
                 rgb[i + 2] = colors[tile_r][tile_c][2];
             }
         }
-        termimage::print(rgb, rows, cols,
-            termimage::Options()
+        peep::print(rgb, rows, cols,
+            peep::Options()
                 .rgb()
-                .resampling(termimage::Resampling::Nearest)
+                .resampling(peep::Resampling::Nearest)
                 .title("rgb chart: top R G B W / bottom C M Y K"));
     }
     std::cout << std::endl;
@@ -93,8 +93,8 @@ int main() {
                     -0.5 * ((c - center) * (c - center)
                           + (r - center) * (r - center))
                     / (sigma * sigma));
-        termimage::print(gauss, n, n,
-            termimage::Options().colormap("magma").title("gaussian x pi"));
+        peep::print(gauss, n, n,
+            peep::Options().colormap("magma").title("gaussian x pi"));
     }
     std::cout << std::endl;
 
@@ -110,8 +110,8 @@ int main() {
                 else
                     board[r * cols + c] = static_cast<double>((r + c) % 5) / 4.0;
             }
-        termimage::print(board, rows, cols,
-            termimage::Options().colormap("viridis").title("checkerboard + NaN"));
+        peep::print(board, rows, cols,
+            peep::Options().colormap("viridis").title("checkerboard + NaN"));
     }
     std::cout << std::endl;
 
@@ -120,8 +120,8 @@ int main() {
         int mat[64];
         for (int i = 0; i < 64; ++i)
             mat[i] = i;
-        termimage::print(mat, 8, 8,
-            termimage::Options().center_crop(4, 4, 6, 4).title("center-cropped integers"));
+        peep::print(mat, 8, 8,
+            peep::Options().center_crop(4, 4, 6, 4).title("center-cropped integers"));
     }
     std::cout << std::endl;
 
@@ -132,8 +132,8 @@ int main() {
             -inf, 0.0, 0.25, 0.5,
             0.75, 1.0, inf, 0.5
         };
-        termimage::print(data, 2, 4,
-            termimage::Options().colormap("magma")
+        peep::print(data, 2, 4,
+            peep::Options().colormap("magma")
                                 .clim(0.0, 1.0)
                                 .title("inf handling"));
     }
@@ -158,8 +158,8 @@ int main() {
                         * std::exp(-(x + 1) * (x + 1) - y * y);
             }
         }
-        termimage::print(peaks, n, n,
-            termimage::Options().colormap("viridis").title("peaks"));
+        peep::print(peaks, n, n,
+            peep::Options().colormap("viridis").title("peaks"));
     }
 
     return 0;

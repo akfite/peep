@@ -1,7 +1,7 @@
 // Platform-specific terminal size query, kept out of the core header so
-// termimage.hpp stays free of <windows.h>/<sys/ioctl.h>.
-#ifndef TERMIMAGE_TERMINAL_HPP
-#define TERMIMAGE_TERMINAL_HPP
+// peep.hpp stays free of <windows.h>/<sys/ioctl.h>.
+#ifndef PEEP_TERMINAL_HPP
+#define PEEP_TERMINAL_HPP
 
 #include <cstddef>
 #include <iostream>
@@ -20,7 +20,7 @@
     #include <unistd.h>
 #endif
 
-namespace termimage {
+namespace peep {
 namespace detail {
 
 struct TerminalSize {
@@ -93,6 +93,6 @@ inline TerminalSize query_terminal_size(const std::ostream& os) {
 }
 
 } // namespace detail
-} // namespace termimage
+} // namespace peep
 
-#endif // TERMIMAGE_TERMINAL_HPP
+#endif // PEEP_TERMINAL_HPP

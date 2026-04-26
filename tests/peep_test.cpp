@@ -1,4 +1,4 @@
-#include <termimage/termimage.hpp>
+#include <peep/peep.hpp>
 
 #include <gtest/gtest.h>
 
@@ -11,8 +11,8 @@
 #include <string>
 #include <vector>
 
-using namespace termimage;
-namespace tid = termimage::detail;
+using namespace peep;
+namespace tid = peep::detail;
 
 // ---------------------------------------------------------------------------
 // Options
@@ -308,7 +308,7 @@ static std::string render_to_string(const double* data, size_t rows, size_t cols
     std::ostringstream oss;
     Options opts = base;
     opts.ostream(oss).colorbar(false);
-    termimage::print(data, rows, cols, opts);
+    peep::print(data, rows, cols, opts);
     return oss.str();
 }
 
@@ -318,7 +318,7 @@ static std::string capture_rgb_output(const std::uint8_t* data, size_t rows, siz
     std::ostringstream oss;
     Options opts = base;
     opts.ostream(oss).rgb(rgb_layout);
-    termimage::print(data, rows, cols, opts);
+    peep::print(data, rows, cols, opts);
     return oss.str();
 }
 
@@ -675,7 +675,7 @@ TEST(Render, CropPadsRgbInputWithBlack) {
 TEST(Render, IntegerDataType) {
     int data[] = {0, 64, 128, 255};
     std::ostringstream oss;
-    termimage::print(data, 2, 2, Options().ostream(oss));
+    peep::print(data, 2, 2, Options().ostream(oss));
     std::string out = oss.str();
     EXPECT_FALSE(out.empty());
     EXPECT_NE(out.find("\x1b["), std::string::npos);
@@ -695,7 +695,7 @@ TEST(Render, ConfiguredInfColorsOverrideColormapEndpoints) {
 TEST(Render, FloatDataType) {
     float data[] = {0.0f, 0.25f, 0.75f, 1.0f};
     std::ostringstream oss;
-    termimage::print(data, 2, 2, Options().ostream(oss));
+    peep::print(data, 2, 2, Options().ostream(oss));
     std::string out = oss.str();
     EXPECT_FALSE(out.empty());
 }
@@ -766,14 +766,14 @@ TEST(RenderRgb, VectorInputMatchesPointerInput) {
         0, 0, 255
     };
     std::ostringstream oss;
-    termimage::print(data, 2, 1, Options().ostream(oss).rgb());
+    peep::print(data, 2, 1, Options().ostream(oss).rgb());
 
     EXPECT_EQ(oss.str(), capture_rgb_output(data.data(), 2, 1));
 }
 
 TEST(RenderRgb, VectorInputRejectsMismatchedDimensions) {
     std::vector<std::uint8_t> data(5);
-    EXPECT_THROW(termimage::print(data, 2, 1, Options().rgb()), std::invalid_argument);
+    EXPECT_THROW(peep::print(data, 2, 1, Options().rgb()), std::invalid_argument);
 }
 
 TEST(RenderAccessor, ScalarAccessorMatchesPointerInput) {
@@ -1343,7 +1343,7 @@ TEST(Title, RenderPrependsConciseSummaryWhenEnabled) {
     double data[] = {0.0, 1.0, 2.0, 3.0};
     std::string out = to_string(data, 2, 2, Options().title());
 
-    EXPECT_EQ(out.find("termimage: data=2x2 cmap=gray\n"), 0u);
+    EXPECT_EQ(out.find("peep: data=2x2 cmap=gray\n"), 0u);
 }
 
 TEST(Title, CustomLabelAndNonDefaultOptionsAppearInSummary) {
@@ -1370,19 +1370,19 @@ TEST(Title, SummaryIncludesCrop) {
     opts.title().crop(1, 2, 3, 4).colormap("viridis");
 
     EXPECT_EQ(tid::render_title(opts, 10, 20, 2, 1, 4, 3, 4, 3, false),
-        "termimage: data=10x20 crop=(1,2 3x4) cmap=viridis");
+        "peep: data=10x20 crop=(1,2 3x4) cmap=viridis");
 }
 
 TEST(Title, SummaryIncludesRenderedSizeWhenResampledOrTrimmed) {
     Options resampled;
     resampled.title().colormap("magma");
     EXPECT_EQ(tid::render_title(resampled, 100, 200, 0, 0, 100, 200, 20, 40, true),
-        "termimage: data=100x200 rendered as 20x40 resampled cmap=magma");
+        "peep: data=100x200 rendered as 20x40 resampled cmap=magma");
 
     Options trimmed;
     trimmed.title().fit(Fit::Trim);
     EXPECT_EQ(tid::render_title(trimmed, 100, 200, 0, 0, 100, 200, 20, 40, false),
-        "termimage: data=100x200 rendered as 20x40 trimmed cmap=gray");
+        "peep: data=100x200 rendered as 20x40 trimmed cmap=gray");
 }
 
 TEST(Title, RgbSummaryIncludesRgbLayout) {

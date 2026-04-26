@@ -1,4 +1,4 @@
-#include <termimage/termimage.hpp>
+#include <peep/peep.hpp>
 
 #include <cstdint>
 #include <cstdlib>
@@ -9,8 +9,8 @@
 #include <string>
 #include <vector>
 
-#ifndef TERMIMAGE_PPM_DEMO_PATH
-#define TERMIMAGE_PPM_DEMO_PATH "assets/cat.ppm"
+#ifndef PEEP_PPM_DEMO_PATH
+#define PEEP_PPM_DEMO_PATH "assets/cat.ppm"
 #endif
 
 struct Image {
@@ -79,14 +79,14 @@ static Image load_ascii_ppm(const std::string& path) {
 }
 
 int main(int argc, char** argv) {
-    const std::string path = (argc > 1) ? argv[1] : TERMIMAGE_PPM_DEMO_PATH;
+    const std::string path = (argc > 1) ? argv[1] : PEEP_PPM_DEMO_PATH;
 
     try {
         Image image = load_ascii_ppm(path);
-        termimage::print(image.rgb, image.height, image.width,
-            termimage::Options()
+        peep::print(image.rgb, image.height, image.width,
+            peep::Options()
                 .rgb()
-                .fit(termimage::Fit::Off)
+                .fit(peep::Fit::Off)
                 .block_size(1)
                 .title(path));
     } catch (const std::exception& e) {

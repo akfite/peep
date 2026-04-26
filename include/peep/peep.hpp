@@ -1,5 +1,5 @@
-#ifndef TERMIMAGE_TERMIMAGE_HPP
-#define TERMIMAGE_TERMIMAGE_HPP
+#ifndef PEEP_PEEP_HPP
+#define PEEP_PEEP_HPP
 
 #include <algorithm>
 #include <array>
@@ -16,10 +16,10 @@
 #include <type_traits>
 #include <vector>
 
-#include "termimage/colormaps.hpp"
-#include "termimage/terminal.hpp"
+#include "peep/colormaps.hpp"
+#include "peep/terminal.hpp"
 
-namespace termimage {
+namespace peep {
 
 typedef std::array<std::uint8_t, 768> ColormapLut;
 
@@ -138,7 +138,7 @@ public:
     }
     Options& colormap(const std::vector<std::uint8_t>& lut) {
         if (lut.size() != custom_cmap_.size()) {
-            throw std::invalid_argument("termimage custom colormap must contain exactly 768 bytes");
+            throw std::invalid_argument("peep custom colormap must contain exactly 768 bytes");
         }
         std::copy(lut.begin(), lut.end(), custom_cmap_.begin());
         custom_cmap_set_ = true;
@@ -844,7 +844,7 @@ inline void append_title_summary(std::ostringstream& ss, const Options& opts,
                                  size_t out_r, size_t out_c,
                                  bool resample) {
     const std::string& label = opts.title_text();
-    ss << (label.empty() ? "termimage" : sanitize_title_text(label)) << ": ";
+    ss << (label.empty() ? "peep" : sanitize_title_text(label)) << ": ";
     ss << "data=" << rows << 'x' << cols;
 
     const bool cropped = (r0 != 0 || c0 != 0 || vr != rows || vc != cols);
@@ -1190,39 +1190,39 @@ inline void render_rgb(const std::uint8_t* data, size_t rows, size_t cols,
 inline void validate_vector_size(size_t size, size_t rows, size_t cols) {
     if (rows == 0 || cols == 0) return;
     if (cols != 0 && rows > (std::numeric_limits<size_t>::max() / cols)) {
-        throw std::invalid_argument("termimage vector dimensions overflow size_t");
+        throw std::invalid_argument("peep vector dimensions overflow size_t");
     }
     const size_t expected = rows * cols;
     if (size != expected) {
-        throw std::invalid_argument("termimage vector size must equal rows * cols");
+        throw std::invalid_argument("peep vector size must equal rows * cols");
     }
 }
 
 inline void validate_rgb_vector_size(size_t size, size_t rows, size_t cols) {
     if (rows == 0 || cols == 0) return;
     if (cols != 0 && rows > (std::numeric_limits<size_t>::max() / cols)) {
-        throw std::invalid_argument("termimage RGB vector dimensions overflow size_t");
+        throw std::invalid_argument("peep RGB vector dimensions overflow size_t");
     }
     const size_t pixels = rows * cols;
     if (pixels > (std::numeric_limits<size_t>::max() / 3)) {
-        throw std::invalid_argument("termimage RGB vector dimensions overflow size_t");
+        throw std::invalid_argument("peep RGB vector dimensions overflow size_t");
     }
     const size_t expected = pixels * 3;
     if (size != expected) {
-        throw std::invalid_argument("termimage RGB vector size must equal rows * cols * 3");
+        throw std::invalid_argument("peep RGB vector size must equal rows * cols * 3");
     }
 }
 
 inline void render_from_options(size_t rows, size_t cols, const Options& opts) {
     if (opts.is_rgb()) {
         if (!opts.has_rgb_accessor()) {
-            throw std::invalid_argument("termimage RGB accessor is required for print(rows, cols, opts)");
+            throw std::invalid_argument("peep RGB accessor is required for print(rows, cols, opts)");
         }
         render_rgb_source(rows, cols, opts.rgb_accessor(), "accessor", opts);
         return;
     }
     if (!opts.has_accessor()) {
-        throw std::invalid_argument("termimage accessor is required for print(rows, cols, opts)");
+        throw std::invalid_argument("peep accessor is required for print(rows, cols, opts)");
     }
     render_scalar_source(rows, cols, opts.accessor(), opts);
 }
@@ -1237,7 +1237,7 @@ inline std::string render_options_to_string(size_t rows, size_t cols, const Opti
 
 template <typename T>
 inline void render_data_as_rgb(const T*, size_t, size_t, const Options&, std::false_type) {
-    throw std::invalid_argument("termimage RGB input data must be std::uint8_t");
+    throw std::invalid_argument("peep RGB input data must be std::uint8_t");
 }
 
 inline void render_data_as_rgb(const std::uint8_t* data, size_t rows, size_t cols,
@@ -1248,7 +1248,7 @@ inline void render_data_as_rgb(const std::uint8_t* data, size_t rows, size_t col
 template <typename T>
 inline void render_data(const T* data, size_t rows, size_t cols, const Options& opts) {
     if (opts.has_accessor() || opts.has_rgb_accessor()) {
-        throw std::invalid_argument("termimage accessor options require print(rows, cols, opts)");
+        throw std::invalid_argument("peep accessor options require print(rows, cols, opts)");
     }
     if (opts.is_rgb()) {
         render_data_as_rgb(data, rows, cols, opts, typename std::is_same<T, std::uint8_t>::type());
@@ -1271,11 +1271,11 @@ template <typename T>
 inline void validate_data_vector_size(size_t size, size_t rows, size_t cols,
                                       const Options& opts) {
     if (opts.has_accessor() || opts.has_rgb_accessor()) {
-        throw std::invalid_argument("termimage accessor options require print(rows, cols, opts)");
+        throw std::invalid_argument("peep accessor options require print(rows, cols, opts)");
     }
     if (opts.is_rgb()) {
         if (!std::is_same<T, std::uint8_t>::value) {
-            throw std::invalid_argument("termimage RGB vector input must contain std::uint8_t values");
+            throw std::invalid_argument("peep RGB vector input must contain std::uint8_t values");
         }
         validate_rgb_vector_size(size, rows, cols);
     } else {
@@ -1357,6 +1357,6 @@ inline std::string to_string(size_t rows, size_t cols, const Options& opts) {
     return detail::render_options_to_string(rows, cols, opts);
 }
 
-} // namespace termimage
+} // namespace peep
 
-#endif // TERMIMAGE_TERMIMAGE_HPP
+#endif // PEEP_PEEP_HPP

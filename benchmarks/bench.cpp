@@ -1,4 +1,4 @@
-#include <termimage/termimage.hpp>
+#include <peep/peep.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -113,21 +113,21 @@ static std::vector<std::uint8_t> interleaved_to_planar(
 
 static BenchResult run_bench(const std::string& name,
                               const double* data, size_t rows, size_t cols,
-                              const termimage::Options& base_opts,
+                              const peep::Options& base_opts,
                               int iterations,
                               OutputMode mode = OutputMode::Buffer) {
     // Warmup
     {
         std::ostringstream sink;
-        termimage::Options opts = base_opts;
+        peep::Options opts = base_opts;
         if (mode == OutputMode::Buffer) opts.ostream(sink);
         else opts.ostream(std::cout);
-        termimage::print(data, rows, cols, opts);
+        peep::print(data, rows, cols, opts);
     }
 
     // Measure
     std::ostringstream sink;
-    termimage::Options opts = base_opts;
+    peep::Options opts = base_opts;
     if (mode == OutputMode::Buffer) opts.ostream(sink);
     else opts.ostream(std::cout);
 
@@ -139,7 +139,7 @@ static BenchResult run_bench(const std::string& name,
         } else {
             std::cout << "\x1b[H\x1b[J";
         }
-        termimage::print(data, rows, cols, opts);
+        peep::print(data, rows, cols, opts);
         if (mode == OutputMode::Terminal) std::cout.flush();
     }
     auto t1 = Clock::now();
@@ -158,23 +158,23 @@ static BenchResult run_bench(const std::string& name,
 
 static BenchResult run_rgb_bench(const std::string& name,
                                  const std::uint8_t* data, size_t rows, size_t cols,
-                                 termimage::RGBLayout rgb_layout,
-                                 const termimage::Options& base_opts,
+                                 peep::RGBLayout rgb_layout,
+                                 const peep::Options& base_opts,
                                  int iterations,
                                  OutputMode mode = OutputMode::Buffer) {
     // Warmup
     {
         std::ostringstream sink;
-        termimage::Options opts = base_opts;
+        peep::Options opts = base_opts;
         opts.rgb(rgb_layout);
         if (mode == OutputMode::Buffer) opts.ostream(sink);
         else opts.ostream(std::cout);
-        termimage::print(data, rows, cols, opts);
+        peep::print(data, rows, cols, opts);
     }
 
     // Measure
     std::ostringstream sink;
-    termimage::Options opts = base_opts;
+    peep::Options opts = base_opts;
     opts.rgb(rgb_layout);
     if (mode == OutputMode::Buffer) opts.ostream(sink);
     else opts.ostream(std::cout);
@@ -187,7 +187,7 @@ static BenchResult run_rgb_bench(const std::string& name,
         } else {
             std::cout << "\x1b[H\x1b[J";
         }
-        termimage::print(data, rows, cols, opts);
+        peep::print(data, rows, cols, opts);
         if (mode == OutputMode::Terminal) std::cout.flush();
     }
     auto t1 = Clock::now();
@@ -243,7 +243,7 @@ int main(int argc, char** argv) {
         auto data = make_gradient(8, 16);
         results.push_back(run_bench(
             "small_gradient_bs1", data.data(), 8, 16,
-            termimage::Options().colormap("viridis").block_size(1),
+            peep::Options().colormap("viridis").block_size(1),
             iters(5000), mode));
     }
 
@@ -252,7 +252,7 @@ int main(int argc, char** argv) {
         auto data = make_gradient(8, 16);
         results.push_back(run_bench(
             "small_gradient_bs4", data.data(), 8, 16,
-            termimage::Options().colormap("viridis").block_size(4),
+            peep::Options().colormap("viridis").block_size(4),
             iters(2000), mode));
     }
 
@@ -261,7 +261,7 @@ int main(int argc, char** argv) {
         auto data = make_gaussian(64);
         results.push_back(run_bench(
             "medium_gaussian_bs1", data.data(), 64, 64,
-            termimage::Options().colormap("magma").block_size(1),
+            peep::Options().colormap("magma").block_size(1),
             iters(500), mode));
     }
 
@@ -270,7 +270,7 @@ int main(int argc, char** argv) {
         auto data = make_gaussian(64);
         results.push_back(run_bench(
             "medium_gaussian_bs2", data.data(), 64, 64,
-            termimage::Options().colormap("magma").block_size(2),
+            peep::Options().colormap("magma").block_size(2),
             iters(200), mode));
     }
 
@@ -279,7 +279,7 @@ int main(int argc, char** argv) {
         auto data = make_gradient(200, 300);
         results.push_back(run_bench(
             "large_gradient_bs1", data.data(), 200, 300,
-            termimage::Options().colormap("viridis").block_size(1),
+            peep::Options().colormap("viridis").block_size(1),
             iters(50), mode));
     }
 
@@ -288,7 +288,7 @@ int main(int argc, char** argv) {
         auto data = make_noisy(200, 300);
         results.push_back(run_bench(
             "large_noisy_bs1", data.data(), 200, 300,
-            termimage::Options().colormap("viridis").block_size(1),
+            peep::Options().colormap("viridis").block_size(1),
             iters(50), mode));
     }
 
@@ -297,7 +297,7 @@ int main(int argc, char** argv) {
         auto data = make_gradient(200, 300);
         results.push_back(run_bench(
             "large_gradient_bs3", data.data(), 200, 300,
-            termimage::Options().colormap("gray").block_size(3),
+            peep::Options().colormap("gray").block_size(3),
             iters(20), mode));
     }
 
@@ -306,7 +306,7 @@ int main(int argc, char** argv) {
         auto data = make_gradient(200, 300);
         results.push_back(run_bench(
             "large_gradient_crop", data.data(), 200, 300,
-            termimage::Options().colormap("viridis").crop(50, 50, 200, 100),
+            peep::Options().colormap("viridis").crop(50, 50, 200, 100),
             iters(100), mode));
     }
 
@@ -315,8 +315,8 @@ int main(int argc, char** argv) {
         auto data = make_rgb_blocks(64, 128);
         results.push_back(run_rgb_bench(
             "rgb_blocks_interleaved", data.data(), 64, 128,
-            termimage::RGBLayout::Interleaved,
-            termimage::Options().block_size(1),
+            peep::RGBLayout::Interleaved,
+            peep::Options().block_size(1),
             iters(500), mode));
     }
 
@@ -326,8 +326,8 @@ int main(int argc, char** argv) {
         auto data = interleaved_to_planar(interleaved, 64, 128);
         results.push_back(run_rgb_bench(
             "rgb_blocks_planar", data.data(), 64, 128,
-            termimage::RGBLayout::Planar,
-            termimage::Options().block_size(1),
+            peep::RGBLayout::Planar,
+            peep::Options().block_size(1),
             iters(500), mode));
     }
 
@@ -336,8 +336,8 @@ int main(int argc, char** argv) {
         auto data = make_rgb_noisy(200, 300);
         results.push_back(run_rgb_bench(
             "rgb_noisy_interleaved", data.data(), 200, 300,
-            termimage::RGBLayout::Interleaved,
-            termimage::Options().block_size(1),
+            peep::RGBLayout::Interleaved,
+            peep::Options().block_size(1),
             iters(50), mode));
     }
 
@@ -346,8 +346,8 @@ int main(int argc, char** argv) {
         auto data = make_rgb_blocks(200, 300);
         results.push_back(run_rgb_bench(
             "rgb_blocks_crop", data.data(), 200, 300,
-            termimage::RGBLayout::Interleaved,
-            termimage::Options().crop(50, 50, 200, 100),
+            peep::RGBLayout::Interleaved,
+            peep::Options().crop(50, 50, 200, 100),
             iters(100), mode));
     }
 

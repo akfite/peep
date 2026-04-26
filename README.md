@@ -1,21 +1,21 @@
-# termimage
+# peep
 
-`termimage` is a tiny header-only C++11 library for printing data as color images directly to the terminal.
+`peep` is a tiny header-only C++11 library for printing data as color images directly to the terminal.
 
 It is not trying to be a graphics stack. It is for the moment when you have an image, matrix, or data buffer in C++ and you want to visualize it right now without pulling in OpenCV, SDL, Qt, matplotlib, etc.
 
 ```cpp
-#include <termimage/termimage.hpp>
+#include <peep/peep.hpp>
 
 int main() {
     int data[] = { 1, 2, 3, 4, 5, 6 };
-    termimage::print(data, 2, 3); // interpret as a 2x3 matrix
+    peep::print(data, 2, 3); // interpret as a 2x3 matrix
 }
 ```
 
 That prints ANSI truecolor half-blocks. If your terminal supports 24-bit color, you will see a matrix displayed as an image:
 
-![termimage rendering a small matrix in the terminal](assets/readme_intro_demo.jpg)
+![peep rendering a small matrix in the terminal](assets/readme_intro_demo.jpg)
 
 ## Why does this exist?
 
@@ -48,7 +48,7 @@ Sometimes importing a real graphics library is impractical or just more work tha
 ### Two-dimensional data
 
 ```cpp
-#include <termimage/termimage.hpp>
+#include <peep/peep.hpp>
 #include <vector>
 
 int main() {
@@ -59,7 +59,7 @@ int main() {
         0.3, 0.5, 0.7, 1.0
     };
 
-    termimage::print(img, 4, 4, termimage::Options()
+    peep::print(img, 4, 4, peep::Options()
         .colormap("magma")
         .clim(0.0, 1.0)
         .title("score matrix"));
@@ -76,26 +76,26 @@ std::vector<std::uint8_t> rgb = {
     0, 0, 255,     255, 255, 255
 };
 
-termimage::print(rgb, 2, 2,
-    termimage::Options()
+peep::print(rgb, 2, 2,
+    peep::Options()
         .rgb()
         .block_size(4)
-        .fit(termimage::Fit::Off)
+        .fit(peep::Fit::Off)
         .title("rgb sanity check"));
 ```
 
 For planar data, use:
 
 ```cpp
-termimage::Options().rgb(termimage::RGBLayout::Planar);
+peep::Options().rgb(peep::RGBLayout::Planar);
 ```
 
 ### Custom containers
 
-If your image is not stored as a flat buffer, tell `termimage` how to access your data:
+If your image is not stored as a flat buffer, tell `peep` how to access your data:
 
 ```cpp
-termimage::print(rows, cols, termimage::Options()
+peep::print(rows, cols, peep::Options()
     .accessor([&](size_t r, size_t c) {
         return my_image.value_at(r, c);
     })
@@ -106,10 +106,10 @@ termimage::print(rows, cols, termimage::Options()
 RGB accessors work the same way:
 
 ```cpp
-termimage::print(rows, cols, termimage::Options()
+peep::print(rows, cols, peep::Options()
     .rgb_accessor([&](size_t r, size_t c) {
         auto p = image.pixel(r, c);
-        return termimage::Color{p.red, p.green, p.blue};
+        return peep::Color{p.red, p.green, p.blue};
     }));
 ```
 
@@ -120,24 +120,24 @@ termimage::print(rows, cols, termimage::Options()
 ### Pick a colormap
 
 ```cpp
-termimage::Options().colormap("viridis");
-termimage::Options().colormap(termimage::Colormap::Coolwarm);
+peep::Options().colormap("viridis");
+peep::Options().colormap(peep::Colormap::Coolwarm);
 ```
 
 Scalar images default to `gray`. RGB images ignore colormaps because the input is already color.  You can also set the default colormap once up-front to avoid specifying it every time.
 
 ```cpp
-termimage::set_default_colormap(termimage::Colormap::Viridis);
+peep::set_default_colormap(peep::Colormap::Viridis);
 ```
 
 ### Control the color range
 
-By default, `termimage` scans finite values and uses the data min/max.
+By default, `peep` scans finite values and uses the data min/max.
 
 ```cpp
-termimage::Options().clim(0.0, 1.0);   // fixed scale
-termimage::Options().clim_lo(0.0);     // auto high
-termimage::Options().clim_hi(255.0);   // auto low
+peep::Options().clim(0.0, 1.0);   // fixed scale
+peep::Options().clim_lo(0.0);     // auto high
+peep::Options().clim_hi(255.0);   // auto low
 ```
 
 Manual limits are useful when you want several images to use the same color scale.
@@ -147,8 +147,8 @@ Manual limits are useful when you want several images to use the same color scal
 Some arrays are tiny, and when printed they appear tiny.  Use `block_size` to render every pixel as an `NxN` block of pixels of the same color.  By default it will try to set a block size that renders the image at a reasonable size without clipping the terminal. To override:
 
 ```cpp
-termimage::Options().block_size(1);  // render at the smallest size
-termimage::Options().block_size(4);  // render in 4x4 pixel blocks
+peep::Options().block_size(1);  // render at the smallest size
+peep::Options().block_size(4);  // render in 4x4 pixel blocks
 ```
 
 ### If your data doesn't fit the terminal
@@ -156,9 +156,9 @@ termimage::Options().block_size(4);  // render in 4x4 pixel blocks
 If the image is too large to fit in the terminal, by default it will resample it to fit.  You can configure this behavior:
 
 ```cpp
-termimage::Options().fit(termimage::Fit::Resample); // default (BLI)
-termimage::Options().fit(termimage::Fit::Trim);
-termimage::Options().fit(termimage::Fit::Off);
+peep::Options().fit(peep::Fit::Resample); // default (BLI)
+peep::Options().fit(peep::Fit::Trim);
+peep::Options().fit(peep::Fit::Off);
 ```
 
 `Fit::Resample` shrinks oversized images to fit the terminal via interpolation and also corrects for terminals whose half-block pixels are not physically square.
@@ -172,8 +172,8 @@ termimage::Options().fit(termimage::Fit::Off);
 Crops are in `x, y, w, h` order.
 
 ```cpp
-termimage::Options().crop(20, 10, 64, 64); // left corner, w, h
-termimage::Options().center_crop(128, 96, 80, 60); // center pix, w, h
+peep::Options().crop(20, 10, 64, 64); // left corner, w, h
+peep::Options().center_crop(128, 96, 80, 60); // center pix, w, h
 ```
 
 Crop windows can extend outside the source image. Out-of-bounds scalar pixels render as NaN. Out-of-bounds RGB pixels render as black. This makes fixed-size chips easy to request even near image borders.
@@ -183,10 +183,10 @@ Crop windows can extend outside the source image. Out-of-bounds scalar pixels re
 NaNs are transparent by default, which is often (but not always) what you want for masks and missing data.  If you're hunting for NaNs or Infs, you can set a special color:
 
 ```cpp
-termimage::Options().nan_color(255, 0, 255);
-termimage::Options().inf_colors(
-    termimage::Color{0, 0, 255}, // -inf
-    termimage::Color{255, 0, 0}); // +inf
+peep::Options().nan_color(255, 0, 255);
+peep::Options().inf_colors(
+    peep::Color{0, 0, 255}, // -inf
+    peep::Color{255, 0, 0}); // +inf
 ```
 
 Without explicit infinity colors, infinities map to the low/high ends of the colormap.
@@ -196,22 +196,22 @@ Without explicit infinity colors, infinities map to the low/high ends of the col
 Data buffer inputs (i.e. no custom accessor) are interpreted as row-major memory layout by default but it can be configured:
 
 ```cpp
-termimage::Options().layout(termimage::Layout::RowMajor);
-termimage::Options().layout(termimage::Layout::ColMajor);
+peep::Options().layout(peep::Layout::RowMajor);
+peep::Options().layout(peep::Layout::ColMajor);
 ```
 
 ### Capture instead of printing
 
 ```cpp
-std::string ansi = termimage::to_string(data, rows, cols,
-    termimage::Options().colormap("cividis"));
+std::string ansi = peep::to_string(data, rows, cols,
+    peep::Options().colormap("cividis"));
 ```
 
 This is handy for tests, logs, or writing to a different stream yourself.
 
 ## Printing a real image
 
-`termimage` does not load PNG/JPEG/etc. `termimage` prints buffers.
+`peep` does not load PNG/JPEG/etc. `peep` prints buffers.
 
 To make the RGB path concrete, the repo includes a plain-text PPM cat image at `assets/cat.ppm` and a small loader example:
 
@@ -224,14 +224,14 @@ cmake --build build
 The important line in `examples/ppm_demo.cpp` is still just:
 
 ```cpp
-termimage::print(image.rgb, image.height, image.width,
-    termimage::Options()
+peep::print(image.rgb, image.height, image.width,
+    peep::Options()
         .rgb()
-        .fit(termimage::Fit::Off)
+        .fit(peep::Fit::Off)
         .block_size(1));
 ```
 
-Use whatever image loader you already have, fill a `std::vector<std::uint8_t>`, and hand it to `termimage`.
+Use whatever image loader you already have, fill a `std::vector<std::uint8_t>`, and hand it to `peep`.
 
 ## More examples
 
@@ -255,7 +255,7 @@ The examples are meant to be readable more than clever. If you are wondering how
 It's a header-only library, so just:
 
 ```cpp
-#include <termimage/termimage.hpp>
+#include <peep/peep.hpp>
 ```
 
 If you want the examples:
@@ -268,9 +268,9 @@ cmake --build build
 By default this builds examples but not tests.
 
 ```bash
-cmake -S . -B build -DTERMIMAGE_BUILD_EXAMPLES=OFF
-cmake -S . -B build -DTERMIMAGE_BUILD_TESTS=ON
-cmake -S . -B build -DTERMIMAGE_BUILD_BENCH=ON
+cmake -S . -B build -DPEEP_BUILD_EXAMPLES=OFF
+cmake -S . -B build -DPEEP_BUILD_TESTS=ON
+cmake -S . -B build -DPEEP_BUILD_BENCH=ON
 ```
 
 ## Using with CMake
@@ -284,18 +284,18 @@ cmake --install build --prefix /path/to/install
 Consume it:
 
 ```cmake
-find_package(termimage CONFIG REQUIRED)
-target_link_libraries(my_target PRIVATE termimage::termimage)
+find_package(peep CONFIG REQUIRED)
+target_link_libraries(my_target PRIVATE peep::peep)
 ```
 
 ## Tests
 
-Tests use GoogleTest. CMake first looks for an installed GoogleTest package, then a local source tree such as `build/_deps/googletest-src` or `-DTERMIMAGE_GTEST_SOURCE_DIR=/path/to/googletest`.
+Tests use GoogleTest. CMake first looks for an installed GoogleTest package, then a local source tree such as `build/_deps/googletest-src` or `-DPEEP_GTEST_SOURCE_DIR=/path/to/googletest`.
 
 To allow CMake to fetch GoogleTest live:
 
 ```bash
-cmake -S . -B build -DTERMIMAGE_BUILD_TESTS=ON -DTERMIMAGE_FETCH_GTEST=ON
+cmake -S . -B build -DPEEP_BUILD_TESTS=ON -DPEEP_FETCH_GTEST=ON
 cmake --build build
 ctest --test-dir build
 ```
