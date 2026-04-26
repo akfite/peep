@@ -675,7 +675,8 @@ TEST(Render, CropPadsRgbInputWithBlack) {
 TEST(Render, IntegerDataType) {
     int data[] = {0, 64, 128, 255};
     std::ostringstream oss;
-    peep::print(data, 2, 2, Options().ostream(oss));
+    peep::print(data, 2, 2, peep::Options()
+        .ostream(oss));
     std::string out = oss.str();
     EXPECT_FALSE(out.empty());
     EXPECT_NE(out.find("\x1b["), std::string::npos);
@@ -695,7 +696,8 @@ TEST(Render, ConfiguredInfColorsOverrideColormapEndpoints) {
 TEST(Render, FloatDataType) {
     float data[] = {0.0f, 0.25f, 0.75f, 1.0f};
     std::ostringstream oss;
-    peep::print(data, 2, 2, Options().ostream(oss));
+    peep::print(data, 2, 2, peep::Options()
+        .ostream(oss));
     std::string out = oss.str();
     EXPECT_FALSE(out.empty());
 }
@@ -766,14 +768,19 @@ TEST(RenderRgb, VectorInputMatchesPointerInput) {
         0, 0, 255
     };
     std::ostringstream oss;
-    peep::print(data, 2, 1, Options().ostream(oss).rgb());
+    peep::print(data, 2, 1, peep::Options()
+        .ostream(oss)
+        .rgb());
 
     EXPECT_EQ(oss.str(), capture_rgb_output(data.data(), 2, 1));
 }
 
 TEST(RenderRgb, VectorInputRejectsMismatchedDimensions) {
     std::vector<std::uint8_t> data(5);
-    EXPECT_THROW(peep::print(data, 2, 1, Options().rgb()), std::invalid_argument);
+    EXPECT_THROW(
+        peep::print(data, 2, 1, peep::Options()
+            .rgb()),
+        std::invalid_argument);
 }
 
 TEST(RenderAccessor, ScalarAccessorMatchesPointerInput) {

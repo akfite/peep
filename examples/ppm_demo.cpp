@@ -83,12 +83,11 @@ int main(int argc, char** argv) {
 
     try {
         Image image = load_ascii_ppm(path);
-        peep::print(image.rgb, image.height, image.width,
-            peep::Options()
-                .rgb()
-                .fit(peep::Fit::Off)
-                .block_size(1)
-                .title(path));
+        peep::print(image.rgb, image.height, image.width, peep::Options()
+            .rgb()
+            .fit(peep::Fit::Off)
+            .block_size(1)
+            .title(path));
     } catch (const std::exception& e) {
         std::cerr << "ppm_demo: " << e.what() << '\n';
         return 1;

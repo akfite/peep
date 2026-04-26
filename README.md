@@ -76,12 +76,11 @@ std::vector<std::uint8_t> rgb = {
     0, 0, 255,     255, 255, 255
 };
 
-peep::print(rgb, 2, 2,
-    peep::Options()
-        .rgb()
-        .block_size(4)
-        .fit(peep::Fit::Off)
-        .title("rgb sanity check"));
+peep::print(rgb, 2, 2, peep::Options()
+    .rgb()
+    .block_size(4)
+    .fit(peep::Fit::Off)
+    .title("rgb sanity check"));
 ```
 
 For planar data, use:
@@ -224,11 +223,10 @@ cmake --build build
 The important line in `examples/ppm_demo.cpp` is still just:
 
 ```cpp
-peep::print(image.rgb, image.height, image.width,
-    peep::Options()
-        .rgb()
-        .fit(peep::Fit::Off)
-        .block_size(1));
+peep::print(image.rgb, image.height, image.width, peep::Options()
+    .rgb()
+    .fit(peep::Fit::Off)
+    .block_size(1));
 ```
 
 Use whatever image loader you already have, fill a `std::vector<std::uint8_t>`, and hand it to `peep`.

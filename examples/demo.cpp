@@ -33,10 +33,10 @@ int main() {
             grad[c] = static_cast<double>(c) / (cols - 1);
 
         for (size_t i = 0; i < sizeof(colormaps) / sizeof(colormaps[0]); ++i) {
-            peep::print(grad, 1, cols,
-                peep::Options().colormap(colormaps[i].colormap)
-                                    .title(colormaps[i].name)
-                                    .colorbar(false));
+            peep::print(grad, 1, cols, peep::Options()
+                .colormap(colormaps[i].colormap)
+                .title(colormaps[i].name)
+                .colorbar(false));
         }
     }
     std::cout << std::endl;
@@ -72,11 +72,10 @@ int main() {
                 rgb[i + 2] = colors[tile_r][tile_c][2];
             }
         }
-        peep::print(rgb, rows, cols,
-            peep::Options()
-                .rgb()
-                .resampling(peep::Resampling::Nearest)
-                .title("rgb chart: top R G B W / bottom C M Y K"));
+        peep::print(rgb, rows, cols, peep::Options()
+            .rgb()
+            .resampling(peep::Resampling::Nearest)
+            .title("rgb chart: top R G B W / bottom C M Y K"));
     }
     std::cout << std::endl;
 
@@ -93,8 +92,9 @@ int main() {
                     -0.5 * ((c - center) * (c - center)
                           + (r - center) * (r - center))
                     / (sigma * sigma));
-        peep::print(gauss, n, n,
-            peep::Options().colormap("magma").title("gaussian x pi"));
+        peep::print(gauss, n, n, peep::Options()
+            .colormap("magma")
+            .title("gaussian x pi"));
     }
     std::cout << std::endl;
 
@@ -110,8 +110,9 @@ int main() {
                 else
                     board[r * cols + c] = static_cast<double>((r + c) % 5) / 4.0;
             }
-        peep::print(board, rows, cols,
-            peep::Options().colormap("viridis").title("checkerboard + NaN"));
+        peep::print(board, rows, cols, peep::Options()
+            .colormap("viridis")
+            .title("checkerboard + NaN"));
     }
     std::cout << std::endl;
 
@@ -120,8 +121,9 @@ int main() {
         int mat[64];
         for (int i = 0; i < 64; ++i)
             mat[i] = i;
-        peep::print(mat, 8, 8,
-            peep::Options().center_crop(4, 4, 6, 4).title("center-cropped integers"));
+        peep::print(mat, 8, 8, peep::Options()
+            .center_crop(4, 4, 6, 4)
+            .title("center-cropped integers"));
     }
     std::cout << std::endl;
 
@@ -132,10 +134,10 @@ int main() {
             -inf, 0.0, 0.25, 0.5,
             0.75, 1.0, inf, 0.5
         };
-        peep::print(data, 2, 4,
-            peep::Options().colormap("magma")
-                                .clim(0.0, 1.0)
-                                .title("inf handling"));
+        peep::print(data, 2, 4, peep::Options()
+            .colormap("magma")
+            .clim(0.0, 1.0)
+            .title("inf handling"));
     }
     std::cout << std::endl;
 
@@ -158,8 +160,9 @@ int main() {
                         * std::exp(-(x + 1) * (x + 1) - y * y);
             }
         }
-        peep::print(peaks, n, n,
-            peep::Options().colormap("viridis").title("peaks"));
+        peep::print(peaks, n, n, peep::Options()
+            .colormap("viridis")
+            .title("peaks"));
     }
 
     return 0;
