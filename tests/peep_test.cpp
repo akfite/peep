@@ -14,6 +14,23 @@
 using namespace peep;
 namespace tid = peep::detail;
 
+namespace {
+
+struct ExplicitDoubleCast {
+    explicit operator double() const { return 1.0; }
+};
+
+struct NoDoubleCast {};
+
+static_assert(tid::is_static_castable_to_double<int>::value,
+              "int should be castable to double");
+static_assert(tid::is_static_castable_to_double<ExplicitDoubleCast>::value,
+              "explicit double casts should be accepted");
+static_assert(!tid::is_static_castable_to_double<NoDoubleCast>::value,
+              "non-numeric values should be rejected");
+
+} // namespace
+
 // ---------------------------------------------------------------------------
 // Options
 // ---------------------------------------------------------------------------
