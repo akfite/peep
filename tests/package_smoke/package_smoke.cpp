@@ -1,4 +1,3 @@
-#include <peep/options.hpp>
 #include <peep/peep.hpp>
 
 int main() {
