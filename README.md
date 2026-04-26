@@ -203,10 +203,10 @@ To make the RGB path concrete, the repo includes a plain-text PPM cat image at `
 ```bash
 cmake -S . -B build
 cmake --build build
-./build/ppm_demo
+./build/16_ppm_cat
 ```
 
-The important line in `examples/ppm_demo.cpp` is still just:
+The important line in `examples/16_ppm_cat.cpp` is still just:
 
 ```cpp
 peep::print(image.rgb, image.height, image.width, peep::Options()
@@ -219,20 +219,32 @@ Use whatever image loader you already have, fill a `std::vector<std::uint8_t>`, 
 
 ## More examples
 
+The `examples/` directory is a progressive sequence. It starts with the tiny README snippet and moves toward practical data science, statistics, scientific computing, RGB images, accessors, capture, layouts, and terminal-fit behavior.
+
 ```bash
-./build/demo
+./build/01_readme_minimal
+./build/07_covariance_coolwarm
+./build/12_matlab_peaks
+./build/20_terminal_fit_modes
 ```
 
-The demo shows:
+To run the whole sequence:
 
-- scalar gradients across the built-in colormaps
-- an RGB color chart
-- NaN holes
-- infinity coloring
-- center crops
-- a large resampled surface
+```bash
+scripts/run_examples.sh
+```
 
-The examples are meant to be readable more than clever. If you are wondering how to configure a behavior, checking `examples/demo.cpp` is usually faster than spelunking the implementation.
+Highlights include:
+
+- `04_missing_data_mask.cpp`: grayscale measurements with hot-pink NaN values
+- `07_covariance_coolwarm.cpp`: covariance matrix using a diverging colormap
+- `08_correlation_matrix.cpp`: normalized correlations with fixed `[-1, 1]` scale
+- `12_matlab_peaks.cpp`: MATLAB/Matplotlib-style `peaks`
+- `16_ppm_cat.cpp`: loading a real PPM image into an RGB buffer
+- `18_capture_for_logs.cpp`: capturing ANSI output with `to_string()`
+- `20_terminal_fit_modes.cpp`: comparing terminal fit modes
+
+The examples are meant to be readable more than clever. If you are wondering how to configure a behavior, checking the closest numbered example is usually faster than spelunking the implementation.
 
 ## Building
 

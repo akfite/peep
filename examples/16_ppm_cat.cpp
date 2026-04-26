@@ -1,15 +1,15 @@
 #include <peep/peep.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
-#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
-#ifndef PEEP_PPM_DEMO_PATH
-#define PEEP_PPM_DEMO_PATH "assets/cat.ppm"
+#ifndef PEEP_PPM_CAT_PATH
+#define PEEP_PPM_CAT_PATH "assets/cat.ppm"
 #endif
 
 struct Image {
@@ -39,16 +39,16 @@ static std::uint8_t scale_channel(std::int32_t v, std::int32_t max_value) {
     if (v < 0) v = 0;
     if (v > max_value) v = max_value;
     const std::int64_t scaled =
-        (static_cast<std::int64_t>(v) * 255 + max_value / 2) / max_value;
-    return static_cast<std::uint8_t>(scaled);
+        static_cast<std::int64_t>(v) * 255 + max_value / 2;
+    return static_cast<std::uint8_t>(scaled / max_value);
 }
 
-static Image load_ascii_ppm(const std::string& path) {
+static Image load_ppm(const std::string& path) {
     std::ifstream in(path.c_str());
     if (!in) throw std::runtime_error("could not open " + path);
 
     if (next_token(in) != "P3") {
-        throw std::runtime_error("expected an ASCII PPM (P3) file");
+        throw std::runtime_error("only plain-text P3 PPM files are supported");
     }
 
     const std::int32_t width = next_int(in);
@@ -58,40 +58,29 @@ static Image load_ascii_ppm(const std::string& path) {
         throw std::runtime_error("invalid PPM header");
     }
 
-    Image image;
-    image.width = static_cast<size_t>(width);
-    image.height = static_cast<size_t>(height);
-    if (image.height > (std::numeric_limits<size_t>::max)() / image.width) {
-        throw std::runtime_error("PPM dimensions are too large");
-    }
-    const size_t pixels = image.width * image.height;
-    if (pixels > (std::numeric_limits<size_t>::max)() / 3) {
-        throw std::runtime_error("PPM dimensions are too large");
-    }
+    Image img;
+    img.width = static_cast<size_t>(width);
+    img.height = static_cast<size_t>(height);
+    img.rgb.resize(img.width * img.height * 3);
 
-    image.rgb.reserve(pixels * 3);
-
-    for (size_t i = 0; i < pixels * 3; ++i) {
-        image.rgb.push_back(scale_channel(next_int(in), max_value));
+    for (size_t i = 0; i < img.rgb.size(); ++i) {
+        img.rgb[i] = scale_channel(next_int(in), max_value);
     }
-
-    return image;
+    return img;
 }
 
 int main(int argc, char** argv) {
-    const std::string path = (argc > 1) ? argv[1] : PEEP_PPM_DEMO_PATH;
-
     try {
-        Image image = load_ascii_ppm(path);
+        const std::string path = (argc > 1) ? argv[1] : PEEP_PPM_CAT_PATH;
+        const Image image = load_ppm(path);
         peep::print(image.rgb, image.height, image.width, peep::Options()
             .rgb()
             .fit(peep::Fit::Off)
             .block_size(1)
             .title(path));
     } catch (const std::exception& e) {
-        std::cerr << "ppm_demo: " << e.what() << '\n';
+        std::cerr << "16_ppm_cat: " << e.what() << '\n';
         return 1;
     }
-
     return 0;
 }
