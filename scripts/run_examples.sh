@@ -51,7 +51,7 @@ examples=(
     01_readme_minimal
     02_score_matrix
     03_colormap_gallery
-    04_missing_data_mask
+    04_highlight_nans
     05_outliers_and_infinities
     06_crop_debug_chip
     07_covariance_coolwarm

@@ -236,7 +236,7 @@ scripts/run_examples.sh
 
 Highlights include:
 
-- `04_missing_data_mask.cpp`: grayscale measurements with hot-pink NaN values
+- `04_highlight_nans.cpp`: grayscale measurements with hot-pink NaN values
 - `07_covariance_coolwarm.cpp`: covariance matrix using a diverging colormap
 - `08_correlation_matrix.cpp`: normalized correlations with fixed `[-1, 1]` scale
 - `12_matlab_peaks.cpp`: MATLAB/Matplotlib-style `peaks`

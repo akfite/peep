@@ -52,7 +52,7 @@ if(PEEP_BUILD_EXAMPLES)
         examples/01_readme_minimal.cpp
         examples/02_score_matrix.cpp
         examples/03_colormap_gallery.cpp
-        examples/04_missing_data_mask.cpp
+        examples/04_highlight_nans.cpp
         examples/05_outliers_and_infinities.cpp
         examples/06_crop_debug_chip.cpp
         examples/07_covariance_coolwarm.cpp
