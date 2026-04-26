@@ -7,8 +7,6 @@
 
 #include "peep/options.hpp"
 
-// Rendering implementation. These stay in detail headers so this public
-// umbrella remains a small set of user-facing entrypoints.
 #include "peep/detail/common.hpp"
 #include "peep/detail/colormap.hpp"
 #include "peep/detail/terminal.hpp"
