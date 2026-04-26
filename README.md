@@ -1,43 +1,29 @@
 # peep
 
-`peep` is a small header-only C++11 library for printing data as color images directly to the terminal.
-
-It is not trying to be a graphics stack. It is for the moment when you have an image, matrix, or data buffer in C++ and you want to visualize it right now without pulling in OpenCV, SDL, Qt, matplotlib, etc.
+`peep` is a small header-only C++11 library for printing data as color images directly to the terminal.  It is intended to be an easy-to-use debugging and visualization tool, not a real graphics stack.
 
 ```cpp
 #include <peep/peep.hpp>
 
 int main() {
     int data[] = { 1, 2, 3, 4, 5, 6 };
-    peep::print(data, 2, 3); // interpret as a 2x3 matrix
+    peep::print(data, 2, 3); // as 2x3 matrix
 }
 ```
 
-That prints ANSI truecolor half-blocks. If your terminal supports 24-bit color, you will see a matrix displayed as an image:
+If your terminal supports 24-bit color, you will see a matrix displayed as an image using ANSI half-block characters:
 
 ![peep rendering a small matrix in the terminal](assets/readme_intro_demo.jpg)
 
-## Why does this exist?
-
-Sometimes importing a real graphics library is impractical or just more work than you want to do.  Sometimes you need a quick answer to questions like:
-
-- What's in this array?
-- Is this buffer transposed?
-- Did my RGB channel order get scrambled?
-- Did this crop grab the thing I think it grabbed?
-- Did NaNs creep into my matrix somewhere?
-- Is there structure in this data?
-
 ## Features
 
-- Print any numeric data buffer
-- Print RGB images from interleaved or planar 8-bit data out of the box
-- Support for row-major and column-major memory layouts
-- Print your own custom types by defining an accessor function
+- Print any 2D numeric data or RGB image
 - Includes built-in colormaps from [matplotlib](https://matplotlib.org/): `gray`, `viridis`, `plasma`, `inferno`, `magma`, `cividis`, `coolwarm`, `gnuplot`, `turbo` (or load your own)
 - Render a colorbar and configure color limits
-- NaN and infinity handling
+- Support for row-major and column-major memory layouts
+- Print your own custom types by defining an accessor function
 - Crop out and display only a part of your buffer
+- NaN and infinity handling
 - Automatic block upsampling of small arrays
 - Can resample arrays too large to render in the terminal
 - `to_string()` when you want the ANSI output but do not want to write it yet
