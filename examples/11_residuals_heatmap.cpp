@@ -20,7 +20,7 @@ int main() {
         }
     }
 
-    peep::print(residual, rows, cols, peep::Options()
+    peep::show(residual, rows, cols, peep::Options()
         .colormap("coolwarm")
         .clim(-0.4, 0.4)
         .title("model residuals after fitting only the linear trend"));

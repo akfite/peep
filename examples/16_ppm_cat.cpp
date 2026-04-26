@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
     try {
         const std::string path = (argc > 1) ? argv[1] : PEEP_PPM_CAT_PATH;
         const Image image = load_ppm(path);
-        peep::print(image.rgb, image.height, image.width, peep::Options()
+        peep::show(image.rgb, image.height, image.width, peep::Options()
             .rgb()
             .fit(peep::Fit::Off)
             .block_size(1)

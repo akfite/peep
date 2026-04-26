@@ -19,21 +19,21 @@ int main() {
         }
     }
 
-    peep::print(surface, rows, cols, peep::Options()
+    peep::show(surface, rows, cols, peep::Options()
         .colormap("turbo")
         .fit(peep::Fit::Resample)
         .title("Fit::Resample for a large analytic surface"));
 
     std::cout << '\n';
 
-    peep::print(surface, rows, cols, peep::Options()
+    peep::show(surface, rows, cols, peep::Options()
         .colormap("turbo")
         .fit(peep::Fit::Trim)
         .title("Fit::Trim for the same large surface"));
 
     std::cout << '\n';
 
-    peep::print(surface, rows, cols, peep::Options()
+    peep::show(surface, rows, cols, peep::Options()
         .colormap("turbo")
         .fit(peep::Fit::Off)
         .crop(64, 32, 64, 32)

@@ -19,7 +19,7 @@ int main() {
         ++confusion[truth * classes + pred];
     }
 
-    peep::print(confusion, classes, classes, peep::Options()
+    peep::show(confusion, classes, classes, peep::Options()
         .colormap("magma")
         .block_size(5)
         .title("confusion matrix: rows=true, cols=predicted"));

@@ -325,7 +325,7 @@ static std::string render_to_string(const double* data, size_t rows, size_t cols
     std::ostringstream oss;
     Options opts = base;
     opts.ostream(oss).colorbar(false);
-    peep::print(data, rows, cols, opts);
+    peep::show(data, rows, cols, opts);
     return oss.str();
 }
 
@@ -335,7 +335,7 @@ static std::string capture_rgb_output(const std::uint8_t* data, size_t rows, siz
     std::ostringstream oss;
     Options opts = base;
     opts.ostream(oss).rgb(rgb_layout);
-    peep::print(data, rows, cols, opts);
+    peep::show(data, rows, cols, opts);
     return oss.str();
 }
 
@@ -924,7 +924,7 @@ TEST(Render, CropPadsRgbInputWithBlack) {
 TEST(Render, IntegerDataType) {
     int data[] = {0, 64, 128, 255};
     std::ostringstream oss;
-    peep::print(data, 2, 2, peep::Options()
+    peep::show(data, 2, 2, peep::Options()
         .ostream(oss));
     std::string out = oss.str();
     EXPECT_FALSE(out.empty());
@@ -945,7 +945,7 @@ TEST(Render, ConfiguredInfColorsOverrideColormapEndpoints) {
 TEST(Render, FloatDataType) {
     float data[] = {0.0f, 0.25f, 0.75f, 1.0f};
     std::ostringstream oss;
-    peep::print(data, 2, 2, peep::Options()
+    peep::show(data, 2, 2, peep::Options()
         .ostream(oss));
     std::string out = oss.str();
     EXPECT_FALSE(out.empty());
@@ -1017,7 +1017,7 @@ TEST(RenderRgb, VectorInputMatchesPointerInput) {
         0, 0, 255
     };
     std::ostringstream oss;
-    peep::print(data, 2, 1, peep::Options()
+    peep::show(data, 2, 1, peep::Options()
         .ostream(oss)
         .rgb());
 
@@ -1027,7 +1027,7 @@ TEST(RenderRgb, VectorInputMatchesPointerInput) {
 TEST(RenderRgb, VectorInputRejectsMismatchedDimensions) {
     std::vector<std::uint8_t> data(5);
     EXPECT_THROW(
-        peep::print(data, 2, 1, peep::Options()
+        peep::show(data, 2, 1, peep::Options()
             .rgb()),
         std::invalid_argument);
 }
@@ -1062,8 +1062,8 @@ TEST(RenderAccessor, RgbAccessorMatchesRgbPointerInput) {
 }
 
 TEST(RenderAccessor, MissingAccessorThrows) {
-    EXPECT_THROW(print(2, 2, Options()), std::invalid_argument);
-    EXPECT_THROW(print(2, 2, Options().rgb()), std::invalid_argument);
+    EXPECT_THROW(show(2, 2, Options()), std::invalid_argument);
+    EXPECT_THROW(show(2, 2, Options().rgb()), std::invalid_argument);
     EXPECT_THROW(to_string(2, 2, Options()), std::invalid_argument);
 }
 
@@ -1079,9 +1079,9 @@ TEST(RenderAccessor, DataInputRejectsAccessorOptions) {
         return Color{255, 0, 0};
     };
 
-    EXPECT_THROW(print(scalar_data, 1, 1, Options().accessor(scalar)), std::invalid_argument);
+    EXPECT_THROW(show(scalar_data, 1, 1, Options().accessor(scalar)), std::invalid_argument);
     EXPECT_THROW(to_string(scalar_vec, 1, 1, Options().accessor(scalar)), std::invalid_argument);
-    EXPECT_THROW(print(rgb_data, 1, 1, Options().rgb_accessor(rgb)), std::invalid_argument);
+    EXPECT_THROW(show(rgb_data, 1, 1, Options().rgb_accessor(rgb)), std::invalid_argument);
 }
 
 // ---------------------------------------------------------------------------
@@ -1765,15 +1765,15 @@ TEST(Colorbar, IgnoredForRgbImage) {
 // to_string convenience function
 // ---------------------------------------------------------------------------
 
-TEST(ToString, MatchesPrintOutput) {
+TEST(ToString, MatchesShowOutput) {
     double data[] = {0.0, 0.5, 1.0, 0.25};
-    // to_string should produce the same output as print-to-ostringstream
+    // to_string should produce the same output as show-to-ostringstream
     std::string via_tostring = to_string(data, 2, 2,
         Options().colormap("magma"));
     std::ostringstream oss;
-    print(data, 2, 2, Options().ostream(oss).colormap("magma"));
-    std::string via_print = oss.str();
-    EXPECT_EQ(via_tostring, via_print);
+    show(data, 2, 2, Options().ostream(oss).colormap("magma"));
+    std::string via_show = oss.str();
+    EXPECT_EQ(via_tostring, via_show);
 }
 
 TEST(ToString, EmptyOnZeroDimensions) {
@@ -1794,15 +1794,15 @@ TEST(ToString, DoesNotAffectOriginalOstream) {
     EXPECT_EQ(oss.str(), "");
 }
 
-TEST(ToStringRgb, MatchesPrintOutput) {
+TEST(ToStringRgb, MatchesShowOutput) {
     const std::uint8_t data[] = {
         255, 0, 0,
         0, 0, 255
     };
     std::string via_tostring = to_string(data, 2, 1, Options().rgb());
-    std::string via_print = capture_rgb_output(data, 2, 1);
+    std::string via_show = capture_rgb_output(data, 2, 1);
 
-    EXPECT_EQ(via_tostring, via_print);
+    EXPECT_EQ(via_tostring, via_show);
 }
 
 TEST(ToStringRgb, SupportsPlanarLayout) {
@@ -1828,10 +1828,10 @@ TEST(ToStringRgb, DoesNotAffectOriginalOstream) {
     EXPECT_EQ(oss.str(), "");
 }
 
-TEST(VectorApi, PrintMatchesPointerInput) {
+TEST(VectorApi, ShowMatchesPointerInput) {
     std::vector<double> data = {0.0, 0.5, 1.0, 0.25};
     std::ostringstream oss;
-    print(data, 2, 2, Options().ostream(oss).colormap("magma"));
+    show(data, 2, 2, Options().ostream(oss).colormap("magma"));
 
     EXPECT_EQ(oss.str(), to_string(data.data(), 2, 2,
         Options().colormap("magma")));
@@ -1847,7 +1847,7 @@ TEST(VectorApi, ToStringMatchesPointerInput) {
 TEST(VectorApi, RejectsMismatchedDimensions) {
     std::vector<double> data = {0.0, 1.0, 2.0};
 
-    EXPECT_THROW(print(data, 2, 2), std::invalid_argument);
+    EXPECT_THROW(show(data, 2, 2), std::invalid_argument);
     EXPECT_THROW(to_string(data, 2, 2), std::invalid_argument);
 }
 

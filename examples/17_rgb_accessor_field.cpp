@@ -41,7 +41,7 @@ int main() {
         }
     }
 
-    peep::print(rows, cols, peep::Options()
+    peep::show(rows, cols, peep::Options()
         .rgb_accessor([&](size_t r, size_t c) {
             const Pixel& p = field[r * cols + c];
             return peep::Color{p.red, p.green, p.blue};

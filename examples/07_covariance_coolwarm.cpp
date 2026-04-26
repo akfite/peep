@@ -50,7 +50,7 @@ int main() {
         }
     }
 
-    peep::print(cov, features, features, peep::Options()
+    peep::show(cov, features, features, peep::Options()
         .colormap("coolwarm")
         .clim(-1.2, 1.2)
         .block_size(4)

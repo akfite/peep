@@ -228,13 +228,13 @@ inline void validate_rgb_vector_size(size_t size, size_t rows, size_t cols) {
 inline void render_from_options(size_t rows, size_t cols, const Options& opts) {
     if (opts.is_rgb()) {
         if (!opts.has_rgb_accessor()) {
-            throw std::invalid_argument("peep RGB accessor is required for print(rows, cols, opts)");
+            throw std::invalid_argument("peep RGB accessor is required for show(rows, cols, opts)");
         }
         render_rgb_source(rows, cols, opts.rgb_accessor(), std::string("accessor"), opts);
         return;
     }
     if (!opts.has_accessor()) {
-        throw std::invalid_argument("peep accessor is required for print(rows, cols, opts)");
+        throw std::invalid_argument("peep accessor is required for show(rows, cols, opts)");
     }
     render_scalar_source(rows, cols, opts.accessor(), opts);
 }
@@ -260,7 +260,7 @@ inline void render_data_as_rgb(const std::uint8_t* data, size_t rows, size_t col
 template <typename T>
 inline void render_data(const T* data, size_t rows, size_t cols, const Options& opts) {
     if (opts.has_accessor() || opts.has_rgb_accessor()) {
-        throw std::invalid_argument("peep accessor options require print(rows, cols, opts)");
+        throw std::invalid_argument("peep accessor options require show(rows, cols, opts)");
     }
     if (opts.is_rgb()) {
         render_data_as_rgb(data, rows, cols, opts, typename std::is_same<T, std::uint8_t>::type());
@@ -283,7 +283,7 @@ template <typename T>
 inline void validate_data_vector_size(size_t size, size_t rows, size_t cols,
                                       const Options& opts) {
     if (opts.has_accessor() || opts.has_rgb_accessor()) {
-        throw std::invalid_argument("peep accessor options require print(rows, cols, opts)");
+        throw std::invalid_argument("peep accessor options require show(rows, cols, opts)");
     }
     if (opts.is_rgb()) {
         if (!std::is_same<T, std::uint8_t>::value) {

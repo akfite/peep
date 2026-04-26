@@ -24,7 +24,7 @@ int main() {
         }
     }
 
-    peep::print(activation, observations, neurons, peep::Options()
+    peep::show(activation, observations, neurons, peep::Options()
         .colormap("viridis")
         .clim(0.0, 1.0)
         .title("sigmoid activations across observations and hidden units"));

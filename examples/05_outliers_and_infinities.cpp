@@ -26,7 +26,7 @@ int main() {
     rate[4 * cols + 16] = inf;   // (16, 4): saturated spike
     rate[8 * cols + 11] = 135.0; // (11, 8): finite outlier clipped by clim
 
-    peep::print(rate, rows, cols, peep::Options()
+    peep::show(rate, rows, cols, peep::Options()
         .colormap("cividis")
         .clim(25.0, 85.0)
         .inf_colors(peep::Color{0, 80, 255}, peep::Color{255, 40, 20})

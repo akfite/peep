@@ -29,7 +29,7 @@ int main() {
         }
     }
 
-    peep::print(density, rows, cols, peep::Options()
+    peep::show(density, rows, cols, peep::Options()
         .colormap("turbo")
         .title("Gaussian mixture density estimate"));
 }

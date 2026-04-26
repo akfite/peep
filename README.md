@@ -1,13 +1,13 @@
 # peep
 
-`peep` is a small header-only C++11 library for printing data as color images directly to the terminal.  It is intended to be an easy-to-use debugging and visualization tool, not a real graphics stack.
+`peep` is a small header-only C++11 library for showing data as color images directly in the terminal.  It is intended to be an easy-to-use debugging and visualization tool, not a real graphics stack.
 
 ```cpp
 #include <peep/peep.hpp>
 
 int main() {
     int data[] = { 1, 2, 3, 4, 5, 6 };
-    peep::print(data, 2, 3); // as 2x3 matrix
+    peep::show(data, 2, 3); // as 2x3 matrix
 }
 ```
 
@@ -17,11 +17,11 @@ If your terminal supports 24-bit color, you will see a matrix displayed as an im
 
 ## Features
 
-- Print any 2D numeric data or RGB image
+- Show any 2D numeric data or RGB image
 - Includes built-in colormaps from [matplotlib](https://matplotlib.org/): `gray`, `viridis`, `plasma`, `inferno`, `magma`, `cividis`, `coolwarm`, `gnuplot`, `turbo` (or load your own)
 - Render a colorbar and configure color limits
 - Support for row-major and column-major memory layouts
-- Print your own custom types by defining an accessor function
+- Show your own custom types by defining an accessor function
 - Crop out and display only a part of your buffer
 - NaN and infinity handling
 - Automatic block upsampling of small arrays
@@ -45,7 +45,7 @@ int main() {
         0.3, 0.5, 0.7, 1.0
     };
 
-    peep::print(img, 4, 4, peep::Options()
+    peep::show(img, 4, 4, peep::Options()
         .colormap("magma")
         .clim(0.0, 1.0)
         .title("score matrix"));
@@ -62,7 +62,7 @@ std::vector<std::uint8_t> rgb = {
     0, 0, 255,     255, 255, 255
 };
 
-peep::print(rgb, 2, 2, peep::Options()
+peep::show(rgb, 2, 2, peep::Options()
     .rgb()
     .block_size(4)
     .fit(peep::Fit::Off)
@@ -80,7 +80,7 @@ peep::Options().rgb(peep::RGBLayout::Planar);
 If your image is not stored as a flat buffer, tell `peep` how to access your data:
 
 ```cpp
-peep::print(rows, cols, peep::Options()
+peep::show(rows, cols, peep::Options()
     .accessor([&](size_t r, size_t c) {
         return my_image.value_at(r, c);
     })
@@ -91,7 +91,7 @@ peep::print(rows, cols, peep::Options()
 RGB accessors work the same way:
 
 ```cpp
-peep::print(rows, cols, peep::Options()
+peep::show(rows, cols, peep::Options()
     .rgb_accessor([&](size_t r, size_t c) {
         auto p = image.pixel(r, c);
         return peep::Color{p.red, p.green, p.blue};
@@ -129,7 +129,7 @@ Manual limits are useful when you want several images to use the same color scal
 
 ### Enlarge tiny arrays
 
-Some arrays are tiny, and when printed they appear tiny.  Use `block_size` to render every pixel as an `NxN` block of pixels of the same color.  By default it will try to set a block size that renders the image at a reasonable size without clipping the terminal. To override:
+Some arrays are tiny, and when shown they appear tiny.  Use `block_size` to render every pixel as an `NxN` block of pixels of the same color.  By default it will try to set a block size that renders the image at a reasonable size without clipping the terminal. To override:
 
 ```cpp
 peep::Options().block_size(1);  // render at the smallest size
@@ -152,7 +152,7 @@ peep::Options().fit(peep::Fit::Off);
 
 `Fit::Off` ignores the terminal bounds and just goes for it.  Use this when rendering exact dimensions matters more than fitting the terminal (but it will cause problems if the image is too large to fit the terminal).
 
-### Print a cropped region
+### Show a cropped region
 
 Crops are in `x, y, w, h` order.
 
@@ -185,7 +185,7 @@ peep::Options().layout(peep::Layout::RowMajor);
 peep::Options().layout(peep::Layout::ColMajor);
 ```
 
-### Capture instead of printing
+### Capture instead of showing
 
 ```cpp
 std::string ansi = peep::to_string(data, rows, cols,
@@ -194,9 +194,9 @@ std::string ansi = peep::to_string(data, rows, cols,
 
 This is handy for tests, logs, or writing to a different stream yourself.
 
-## Printing a real image
+## Showing a real image
 
-`peep` does not load PNG/JPEG/etc. `peep` prints buffers.
+`peep` does not load PNG/JPEG/etc. `peep` shows buffers.
 
 To make the RGB path concrete, the repo includes a plain-text PPM cat image at `assets/cat.ppm` and a small loader example:
 
@@ -209,7 +209,7 @@ cmake --build build
 The important line in `examples/16_ppm_cat.cpp` is still just:
 
 ```cpp
-peep::print(image.rgb, image.height, image.width, peep::Options()
+peep::show(image.rgb, image.height, image.width, peep::Options()
     .rgb()
     .fit(peep::Fit::Off)
     .block_size(1));

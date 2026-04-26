@@ -22,7 +22,7 @@ int main() {
         }
     }
 
-    peep::print(scores, rows, cols, peep::Options()
+    peep::show(scores, rows, cols, peep::Options()
         .colormap("magma")
         .clim(0.0, 1.0)
         .title("calibrated risk score matrix"));

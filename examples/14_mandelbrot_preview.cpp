@@ -26,7 +26,7 @@ int main() {
         }
     }
 
-    peep::print(iter, rows, cols, peep::Options()
+    peep::show(iter, rows, cols, peep::Options()
         .colormap("turbo")
         .clim(0.0, static_cast<double>(max_iter))
         .title("Mandelbrot escape iterations"));

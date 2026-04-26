@@ -40,7 +40,7 @@ int main() {
         instrument[p.y * cols + p.x] = nan;
     }
 
-    peep::print(instrument, rows, cols, peep::Options()
+    peep::show(instrument, rows, cols, peep::Options()
         .colormap("gray")
         .clim(0.0, 1.0)
         .nan_color(255, 20, 147)

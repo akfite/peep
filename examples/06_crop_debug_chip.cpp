@@ -28,14 +28,14 @@ int main() {
         }
     }
 
-    peep::print(residual, rows, cols, peep::Options()
+    peep::show(residual, rows, cols, peep::Options()
         .colormap("coolwarm")
         .clim(-3.0, 3.0)
         .title("full residual field"));
 
     std::cout << '\n';
 
-    peep::print(residual, rows, cols, peep::Options()
+    peep::show(residual, rows, cols, peep::Options()
         .colormap("coolwarm")
         .clim(-3.0, 3.0)
         .crop(52, 20, 32, 24)
@@ -43,7 +43,7 @@ int main() {
 
     std::cout << '\n';
 
-    peep::print(residual, rows, cols, peep::Options()
+    peep::show(residual, rows, cols, peep::Options()
         .colormap("coolwarm")
         .clim(-3.0, 3.0)
         .center_crop(24, 48, 28, 20)

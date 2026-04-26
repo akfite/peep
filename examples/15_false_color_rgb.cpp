@@ -35,7 +35,7 @@ int main() {
         }
     }
 
-    peep::print(rgb, rows, cols, peep::Options()
+    peep::show(rgb, rows, cols, peep::Options()
         .rgb()
         .title("false-color composite: vegetation/elevation/moisture"));
 }

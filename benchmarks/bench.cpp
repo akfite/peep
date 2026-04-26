@@ -122,7 +122,7 @@ static BenchResult run_bench(const std::string& name,
         peep::Options opts = base_opts;
         if (mode == OutputMode::Buffer) opts.ostream(sink);
         else opts.ostream(std::cout);
-        peep::print(data, rows, cols, opts);
+        peep::show(data, rows, cols, opts);
     }
 
     // Measure
@@ -139,7 +139,7 @@ static BenchResult run_bench(const std::string& name,
         } else {
             std::cout << "\x1b[H\x1b[J";
         }
-        peep::print(data, rows, cols, opts);
+        peep::show(data, rows, cols, opts);
         if (mode == OutputMode::Terminal) std::cout.flush();
     }
     auto t1 = Clock::now();
@@ -169,7 +169,7 @@ static BenchResult run_rgb_bench(const std::string& name,
         opts.rgb(rgb_layout);
         if (mode == OutputMode::Buffer) opts.ostream(sink);
         else opts.ostream(std::cout);
-        peep::print(data, rows, cols, opts);
+        peep::show(data, rows, cols, opts);
     }
 
     // Measure
@@ -187,7 +187,7 @@ static BenchResult run_rgb_bench(const std::string& name,
         } else {
             std::cout << "\x1b[H\x1b[J";
         }
-        peep::print(data, rows, cols, opts);
+        peep::show(data, rows, cols, opts);
         if (mode == OutputMode::Terminal) std::cout.flush();
     }
     auto t1 = Clock::now();
@@ -351,7 +351,7 @@ int main(int argc, char** argv) {
             iters(100), mode));
     }
 
-    // --- Print results ---
+    // --- Show results ---
     if (mode == OutputMode::Terminal) {
         std::cout << "\x1b[0m\x1b[2J\x1b[H";
     }

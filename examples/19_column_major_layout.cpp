@@ -18,7 +18,7 @@ int main() {
         }
     }
 
-    peep::print(gram, rows, cols, peep::Options()
+    peep::show(gram, rows, cols, peep::Options()
         .layout(peep::Layout::ColMajor)
         .colormap("viridis")
         .block_size(4)

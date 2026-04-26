@@ -29,7 +29,7 @@ int main() {
     }
 
     for (size_t i = 0; i < sizeof(colormaps) / sizeof(colormaps[0]); ++i) {
-        peep::print(quantiles, 1, cols, peep::Options()
+        peep::show(quantiles, 1, cols, peep::Options()
             .colormap(colormaps[i].colormap)
             .clim(0.0, 1.0)
             .title(colormaps[i].name)

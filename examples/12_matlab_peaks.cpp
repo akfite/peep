@@ -24,7 +24,7 @@ int main() {
         }
     }
 
-    peep::print(surface, n, n, peep::Options()
+    peep::show(surface, n, n, peep::Options()
         .colormap("viridis")
         .title("MATLAB peaks surface"));
 }
