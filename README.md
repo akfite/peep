@@ -1,6 +1,6 @@
 # peep
 
-`peep` is a tiny header-only C++11 library for printing data as color images directly to the terminal.
+`peep` is a small header-only C++11 library for printing data as color images directly to the terminal.
 
 It is not trying to be a graphics stack. It is for the moment when you have an image, matrix, or data buffer in C++ and you want to visualize it right now without pulling in OpenCV, SDL, Qt, matplotlib, etc.
 

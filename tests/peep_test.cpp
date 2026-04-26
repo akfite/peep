@@ -323,6 +323,238 @@ static std::string capture_rgb_output(const std::uint8_t* data, size_t rows, siz
 }
 
 // ---------------------------------------------------------------------------
+// Option ordering
+// ---------------------------------------------------------------------------
+
+TEST(OptionOrdering, SimpleSettersUseLastValue) {
+    Options opts;
+    opts.block_size(4)
+        .block_size(0)
+        .layout(Layout::ColMajor)
+        .layout(Layout::RowMajor)
+        .fit(Fit::Trim)
+        .fit(Fit::Off)
+        .resampling(Resampling::Nearest)
+        .resampling(Resampling::Bilinear)
+        .rgb(RGBLayout::Planar)
+        .rgb(RGBLayout::Interleaved)
+        .title("first")
+        .title("second")
+        .title(false)
+        .colorbar(false)
+        .colorbar(true);
+
+    EXPECT_EQ(opts.block_size(), 1u);
+    EXPECT_TRUE(opts.has_block_size());
+    EXPECT_EQ(opts.layout(), Layout::RowMajor);
+    EXPECT_EQ(opts.fit(), Fit::Off);
+    EXPECT_EQ(opts.resampling(), Resampling::Bilinear);
+    EXPECT_TRUE(opts.is_rgb());
+    EXPECT_EQ(opts.rgb_layout(), RGBLayout::Interleaved);
+    EXPECT_FALSE(opts.show_title());
+    EXPECT_EQ(opts.title_text(), "second");
+    EXPECT_TRUE(opts.show_colorbar());
+}
+
+TEST(OptionOrdering, CropModeLastSetterControlsRenderedRegion) {
+    double data[30];
+    for (int i = 0; i < 30; ++i) data[i] = static_cast<double>(i);
+
+    EXPECT_EQ(render_to_string(data, 5, 6,
+                  Options().crop(0, 0, 1, 1)
+                           .center_crop(2, 3, 3, 4)),
+              render_to_string(data, 5, 6,
+                  Options().center_crop(2, 3, 3, 4)));
+
+    EXPECT_EQ(render_to_string(data, 5, 6,
+                  Options().center_crop(2, 3, 3, 4)
+                           .crop(1, 1, 3, 4)),
+              render_to_string(data, 5, 6,
+                  Options().crop(1, 1, 3, 4)));
+
+    EXPECT_EQ(render_to_string(data, 5, 6,
+                  Options().crop(0, 0)
+                           .crop(2, 1, 2, 2)),
+              render_to_string(data, 5, 6,
+                  Options().crop(2, 1, 2, 2)));
+}
+
+TEST(OptionOrdering, ScalarAccessorLastSetterWins) {
+    double expected[] = {1.0};
+
+    Options opts;
+    opts.clim(0.0, 1.0)
+        .colorbar(false)
+        .accessor([](size_t, size_t) {
+            return 0.0;
+        })
+        .accessor([](size_t, size_t) {
+            return 1.0;
+        });
+
+    EXPECT_EQ(to_string(1, 1, opts),
+              to_string(expected, 1, 1,
+                  Options().clim(0.0, 1.0)
+                           .colorbar(false)));
+}
+
+TEST(OptionOrdering, RgbAccessorLastSetterWins) {
+    const std::uint8_t blue[] = {0, 0, 255};
+
+    Options opts;
+    opts.rgb_accessor([](size_t, size_t) {
+            return Color{255, 0, 0};
+        })
+        .rgb_accessor([](size_t, size_t) {
+            return Color{0, 0, 255};
+        });
+
+    EXPECT_EQ(to_string(1, 1, opts),
+              to_string(blue, 1, 1, Options().rgb()));
+}
+
+TEST(OptionOrdering, SourceModeLastSetterControlsAccessorErrors) {
+    const double scalar_data[] = {1.0};
+    const std::uint8_t rgb_data[] = {255, 0, 0};
+    auto scalar = [](size_t, size_t) {
+        return 1.0;
+    };
+    auto rgb = [](size_t, size_t) {
+        return Color{255, 0, 0};
+    };
+
+    Options rgb_after_accessor;
+    rgb_after_accessor.accessor(scalar).rgb();
+    EXPECT_TRUE(rgb_after_accessor.is_rgb());
+    EXPECT_FALSE(rgb_after_accessor.has_accessor());
+    EXPECT_FALSE(rgb_after_accessor.has_rgb_accessor());
+    EXPECT_EQ(to_string(rgb_data, 1, 1, rgb_after_accessor),
+              to_string(rgb_data, 1, 1, Options().rgb()));
+    EXPECT_THROW(to_string(1, 1, rgb_after_accessor), std::invalid_argument);
+
+    Options accessor_after_rgb;
+    accessor_after_rgb.rgb()
+                      .accessor(scalar)
+                      .clim(0.0, 1.0)
+                      .colorbar(false);
+    EXPECT_FALSE(accessor_after_rgb.is_rgb());
+    EXPECT_TRUE(accessor_after_rgb.has_accessor());
+    EXPECT_FALSE(accessor_after_rgb.has_rgb_accessor());
+    EXPECT_EQ(to_string(1, 1, accessor_after_rgb),
+              to_string(scalar_data, 1, 1,
+                  Options().clim(0.0, 1.0)
+                           .colorbar(false)));
+    EXPECT_THROW(to_string(scalar_data, 1, 1, accessor_after_rgb),
+                 std::invalid_argument);
+
+    Options scalar_after_rgb_accessor;
+    scalar_after_rgb_accessor.rgb_accessor(rgb)
+                             .scalar()
+                             .clim(0.0, 1.0)
+                             .colorbar(false);
+    EXPECT_FALSE(scalar_after_rgb_accessor.is_rgb());
+    EXPECT_FALSE(scalar_after_rgb_accessor.has_accessor());
+    EXPECT_FALSE(scalar_after_rgb_accessor.has_rgb_accessor());
+    EXPECT_EQ(to_string(scalar_data, 1, 1, scalar_after_rgb_accessor),
+              to_string(scalar_data, 1, 1,
+                  Options().clim(0.0, 1.0)
+                           .colorbar(false)));
+    EXPECT_THROW(to_string(1, 1, scalar_after_rgb_accessor),
+                 std::invalid_argument);
+}
+
+TEST(OptionOrdering, ColormapLastSetterWinsAcrossNamedAndCustom) {
+    ColormapLut red_lut;
+    for (int i = 0; i < 256; ++i) {
+        red_lut[i * 3 + 0] = 255;
+        red_lut[i * 3 + 1] = 0;
+        red_lut[i * 3 + 2] = 0;
+    }
+
+    double data[] = {0.0, 0.5, 1.0, 0.25};
+
+    EXPECT_EQ(render_to_string(data, 2, 2,
+                  Options().colormap("magma")
+                           .colormap("viridis")),
+              render_to_string(data, 2, 2,
+                  Options().colormap("viridis")));
+
+    const std::string custom_after_named = render_to_string(data, 2, 2,
+        Options().colormap("viridis")
+                 .colormap(red_lut));
+    EXPECT_NE(custom_after_named.find("255;0;0"), std::string::npos);
+
+    EXPECT_EQ(render_to_string(data, 2, 2,
+                  Options().colormap(red_lut)
+                           .colormap("gray")),
+              render_to_string(data, 2, 2,
+                  Options().colormap("gray")));
+}
+
+TEST(OptionOrdering, ClimSettersUseLatestBounds) {
+    double data[] = {0.0, 2.5, 5.0, 10.0};
+
+    EXPECT_EQ(render_to_string(data, 2, 2,
+                  Options().colormap("gray")
+                           .clim(0.0, 10.0)
+                           .clim_lo(5.0)),
+              render_to_string(data, 2, 2,
+                  Options().colormap("gray")
+                           .clim(5.0, 10.0)));
+
+    EXPECT_EQ(render_to_string(data, 2, 2,
+                  Options().colormap("gray")
+                           .clim(0.0, 10.0)
+                           .clim_hi(5.0)),
+              render_to_string(data, 2, 2,
+                  Options().colormap("gray")
+                           .clim(0.0, 5.0)));
+
+    EXPECT_EQ(render_to_string(data, 2, 2,
+                  Options().colormap("gray")
+                           .clim_lo(5.0)
+                           .clim_hi(6.0)
+                           .clim(0.0, 10.0)),
+              render_to_string(data, 2, 2,
+                  Options().colormap("gray")
+                           .clim(0.0, 10.0)));
+}
+
+TEST(OptionOrdering, SpecialValueColorsCanBeOverriddenAndCleared) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double inf = std::numeric_limits<double>::infinity();
+    double nan_data[] = {nan, nan};
+    double inf_data[] = {-inf, inf};
+
+    const std::string nan_override = render_to_string(nan_data, 1, 2,
+        Options().nan_color(1, 2, 3)
+                 .nan_color(9, 8, 7));
+    EXPECT_NE(nan_override.find("9;8;7"), std::string::npos);
+    EXPECT_EQ(nan_override.find("1;2;3"), std::string::npos);
+
+    EXPECT_EQ(render_to_string(nan_data, 1, 2,
+                  Options().nan_color(1, 2, 3)
+                           .clear_nan_color()),
+              render_to_string(nan_data, 1, 2));
+
+    const std::string inf_override = render_to_string(inf_data, 1, 2,
+        Options().clim(0.0, 1.0)
+                 .inf_color(1, 1, 1)
+                 .neg_inf_color(2, 3, 4)
+                 .pos_inf_color(5, 6, 7));
+    EXPECT_NE(inf_override.find("2;3;4"), std::string::npos);
+    EXPECT_NE(inf_override.find("5;6;7"), std::string::npos);
+    EXPECT_EQ(inf_override.find("1;1;1"), std::string::npos);
+
+    EXPECT_EQ(render_to_string(inf_data, 1, 2,
+                  Options().clim(0.0, 1.0)
+                           .inf_color(1, 2, 3)
+                           .clear_inf_colors()),
+              render_to_string(inf_data, 1, 2,
+                  Options().clim(0.0, 1.0)));
+}
+
+// ---------------------------------------------------------------------------
 // Render – edge cases
 // ---------------------------------------------------------------------------
 
