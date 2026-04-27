@@ -29,24 +29,11 @@ If your terminal supports 24-bit color, you will see a matrix displayed as an im
 - `to_string()` when you want the ANSI output but do not want to write it yet
 - All options are configurable
 
-## Run the examples
-
-The fastest way to understand `peep` is to build the examples and run the one closest to what you need.
-
-```bash
-cmake -S . -B build
-cmake --build build
-```
-
-Each file in [`examples/`](examples/) builds to an executable with the same stem.
-
-The screenshots below are generated from the checked-in examples. Exact glyph spacing depends on your terminal font, but the colors and layout should match on a 24-bit truecolor terminal.
-
-## Guided examples
+## Examples
 
 ### Colormaps
 
-[`examples/03_colormap_gallery.cpp`](examples/03_colormap_gallery.cpp) renders the same scalar ramp with each built-in colormap. This is the quickest way to choose a palette before applying it to real data.
+[`examples/03_colormap_gallery.cpp`](examples/03_colormap_gallery.cpp) renders the same linear ramp with each built-in colormap.
 
 ```cpp
 peep::show(values, rows, cols, peep::Options()
@@ -56,11 +43,11 @@ peep::show(values, rows, cols, peep::Options()
 
 ![Expected terminal output from examples/03_colormap_gallery.cpp](assets/readme_03_colormap_gallery.svg)
 
-Scalar images default to `gray`. RGB images ignore colormaps because the input is already color.
+Scalar images default to `gray` if no colormap is specified. RGB rendering paths ignore colormaps.
 
-### Peaks Surface
+### Visualize a 2D function ("peaks")
 
-[`examples/12_matlab_peaks.cpp`](examples/12_matlab_peaks.cpp) renders a smooth scalar surface with the `viridis` colormap.
+[`examples/12_matlab_peaks.cpp`](examples/12_matlab_peaks.cpp) renders a 2D function as an image with the `viridis` colormap.
 
 ```cpp
 peep::show(surface, n, n, peep::Options()
@@ -72,13 +59,13 @@ peep::show(surface, n, n, peep::Options()
 
 ### Highlight NaNs
 
-[`examples/04_highlight_nans.cpp`](examples/04_highlight_nans.cpp) shows how NaNs can be made visible instead of disappearing into the background.
+[`examples/04_highlight_nans.cpp`](examples/04_highlight_nans.cpp) shows how to pinpoint the location of NaNs in an array.
 
 ```cpp
 peep::show(instrument, rows, cols, peep::Options()
     .colormap("gray")
     .clim(0.0, 1.0)
-    .nan_color(255, 20, 147));
+    .nan_color(255, 20, 147)); // hot pink
 ```
 
 ![Expected terminal output from examples/04_highlight_nans.cpp](assets/readme_04_highlight_nans.svg)
@@ -103,18 +90,40 @@ Use fixed limits when comparing several arrays. Otherwise `peep` scans finite va
 
 ### RGB buffers
 
-[`examples/16_ppm_cat.cpp`](examples/16_ppm_cat.cpp) loads the repo's plain-text PPM cat image and passes the RGB bytes directly to `peep`.
+[`examples/16_ppm_cat.cpp`](examples/16_ppm_cat.cpp) loads a plain-text PPM cat image and passes the RGB bytes directly to `peep`, which interprets it as interleaved RGB by default:
 
 ```cpp
 peep::show(image.rgb, image.height, image.width, peep::Options()
-    .rgb()
-    .fit(peep::Fit::Off)
+    .rgb() // peep::RGBLayout::Interleaved
     .block_size(1));
 ```
 
 ![Expected terminal output from examples/16_ppm_cat.cpp](assets/readme_16_ppm_cat.svg)
 
 RGB input is plain `std::uint8_t` data. Interleaved layout means `RGBRGBRGB...`, and planar layout is available with `rgb(peep::RGBLayout::Planar)`.
+
+### Displaying custom types
+
+If your data is not stored as a flat buffer, pass dimensions directly and provide an accessor in `Options`. Scalar accessors return a value that `peep` maps through the selected colormap:
+
+```cpp
+peep::show(rows, cols, peep::Options()
+    .accessor([&](size_t r, size_t c) {
+        return image.value_at(r, c);
+    })
+    .colormap("turbo"));
+```
+
+RGB accessors return a `peep::Color` directly. [`examples/17_rgb_accessor_field.cpp`](examples/17_rgb_accessor_field.cpp) uses this path with a custom `Image` class that stores pixels as YUV and converts them to RGB on demand.
+
+```cpp
+peep::show(image.rows(), image.cols(), peep::Options()
+    .rgb_accessor([&](size_t r, size_t c) {
+        return image.rgb(r, c);
+    }));
+```
+
+![Expected terminal output from examples/17_rgb_accessor_field.cpp](assets/readme_17_rgb_accessor_field.svg)
 
 ## Installation
 
