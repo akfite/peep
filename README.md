@@ -147,17 +147,8 @@ target_link_libraries(my_target PRIVATE peep::peep)
 By default, a top-level build compiles the examples but not tests or benchmarks:
 
 ```bash
-cmake -S . -B build -DPEEP_BUILD_EXAMPLES=OFF
-cmake -S . -B build -DPEEP_BUILD_TESTS=ON
-cmake -S . -B build -DPEEP_BUILD_BENCH=ON
-```
-
-Tests use GoogleTest. CMake first looks for an installed GoogleTest package, then a local source tree such as `build/_deps/googletest-src` or `-DPEEP_GTEST_SOURCE_DIR=/path/to/googletest`.
-
-```bash
-cmake -S . -B build -DPEEP_BUILD_TESTS=ON -DPEEP_FETCH_GTEST=ON
+cmake -S . -B build
 cmake --build build
-ctest --test-dir build
 ```
 
 ## Requirements
