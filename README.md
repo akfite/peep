@@ -88,7 +88,7 @@ peep::show(rows, cols, peep::Options()
     .title("from accessor"));
 ```
 
-RGB accessors work the same way:
+RGB accessors work the same way (except it will skip colormapping; you provide RGB directly):
 
 ```cpp
 peep::show(rows, cols, peep::Options()
