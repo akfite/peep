@@ -54,5 +54,5 @@ int main() {
         .colormap("coolwarm")
         .clim(-1.2, 1.2)
         .block_size(4)
-        .title("covariance matrix from synthetic latent factors"));
+        .title("covariance matrix"));
 }

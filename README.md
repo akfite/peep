@@ -58,6 +58,18 @@ peep::show(values, rows, cols, peep::Options()
 
 Scalar images default to `gray`. RGB images ignore colormaps because the input is already color.
 
+### Peaks Surface
+
+[`examples/12_matlab_peaks.cpp`](examples/12_matlab_peaks.cpp) renders a smooth scalar surface with the `viridis` colormap.
+
+```cpp
+peep::show(surface, n, n, peep::Options()
+    .colormap("viridis")
+    .title("MATLAB peaks surface"));
+```
+
+![Expected terminal output from examples/12_matlab_peaks.cpp](assets/readme_12_matlab_peaks.svg)
+
 ### Highlight NaNs
 
 [`examples/04_highlight_nans.cpp`](examples/04_highlight_nans.cpp) shows how NaNs can be made visible instead of disappearing into the background.
@@ -73,15 +85,16 @@ peep::show(instrument, rows, cols, peep::Options()
 
 Infinities can be handled the same way with `inf_colors()`. See [`examples/05_outliers_and_infinities.cpp`](examples/05_outliers_and_infinities.cpp).
 
-### Fixed scales
+### Covariance Matrix
 
-[`examples/07_covariance_coolwarm.cpp`](examples/07_covariance_coolwarm.cpp) uses a diverging colormap and explicit color limits so negative and positive values share a stable scale.
+[`examples/07_covariance_coolwarm.cpp`](examples/07_covariance_coolwarm.cpp) uses a diverging colormap and explicit color limits for a covariance matrix.
 
 ```cpp
 peep::show(cov, features, features, peep::Options()
     .colormap("coolwarm")
     .clim(-1.2, 1.2)
-    .block_size(4));
+    .block_size(4)
+    .title("covariance matrix"));
 ```
 
 ![Expected terminal output from examples/07_covariance_coolwarm.cpp](assets/readme_07_covariance_coolwarm.svg)
