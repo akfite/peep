@@ -1,6 +1,6 @@
 # peep
 
-[![CI](https://github.com/akfite/peep/actions/workflows/ci.yml/badge.svg)](https://github.com/akfite/peep/actions/workflows/ci.yml)
+[![CI](https://github.com/akfite/peep/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/akfite/peep/actions/workflows/ci.yml?query=branch%3Amaster)
 [![codecov](https://codecov.io/gh/akfite/peep/branch/master/graph/badge.svg)](https://codecov.io/gh/akfite/peep)
 
 `peep` is a small header-only C++11 library for showing data as color images directly in the terminal.  It is intended to be an easy-to-use debugging and visualization tool, not a real graphics stack.
