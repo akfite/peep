@@ -2,3 +2,9 @@ build/
 cmake-build-*/
 CMakeUserPresets.json
 .DS_Store
+.bin
+.mat
+.xls*
+.pdb
+.obj
+.vs/
