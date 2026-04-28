@@ -79,6 +79,7 @@ void render_scalar_source(size_t rows, size_t cols, GetSource get_source_abs,
                           const Options& opts) {
     const ColormapLut& cmap = resolve_colormap(opts);
     std::ostream& os = opts.ostream();
+    prepare_terminal_output(os);
 
     RenderPlan plan = make_render_plan(rows, cols, opts, os);
     if (plan.empty) return;
@@ -151,6 +152,7 @@ template <typename GetSource>
 void render_rgb_source(size_t rows, size_t cols, GetSource get_source_abs,
                        const std::string& rgb_source, const Options& opts) {
     std::ostream& os = opts.ostream();
+    prepare_terminal_output(os);
 
     RenderPlan plan = make_render_plan(rows, cols, opts, os);
     if (plan.empty) return;

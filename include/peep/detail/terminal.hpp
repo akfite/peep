@@ -15,6 +15,9 @@
     #define WIN32_LEAN_AND_MEAN
     #endif
     #include <windows.h>
+    #ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+    #define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+    #endif
 #else
     #include <sys/ioctl.h>
     #include <unistd.h>
@@ -42,6 +45,41 @@ inline int stream_fd(const std::ostream& os) {
     return -1;
 }
 
+#if defined(_WIN32)
+inline HANDLE stream_console_handle(const std::ostream& os) {
+    const int fd = stream_fd(os);
+    if (fd < 0) return nullptr;
+
+    HANDLE h = reinterpret_cast<HANDLE>(_get_osfhandle(fd));
+    if (h == reinterpret_cast<HANDLE>(-1)) return nullptr;
+    return h;
+}
+
+inline bool is_console_handle(HANDLE h) {
+    if (h == nullptr) return false;
+    DWORD mode = 0;
+    return GetConsoleMode(h, &mode) != 0;
+}
+
+inline void prepare_terminal_output(const std::ostream& os) {
+    HANDLE h = stream_console_handle(os);
+    if (!is_console_handle(h)) return;
+
+    DWORD mode = 0;
+    if (GetConsoleMode(h, &mode)) {
+        SetConsoleMode(h, mode
+            | ENABLE_PROCESSED_OUTPUT
+            | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+    }
+
+    // The image body uses UTF-8 half-block characters. Classic Windows
+    // consoles otherwise decode narrow output with the active OEM code page.
+    SetConsoleOutputCP(CP_UTF8);
+}
+#else
+inline void prepare_terminal_output(const std::ostream&) {}
+#endif
+
 inline TerminalSize query_terminal_size(const std::ostream& os) {
     TerminalSize ts;
     ts.rows = 0;
@@ -55,8 +93,8 @@ inline TerminalSize query_terminal_size(const std::ostream& os) {
     if (fd < 0) return ts;
 
 #if defined(_WIN32)
-    HANDLE h = reinterpret_cast<HANDLE>(_get_osfhandle(fd));
-    if (h == reinterpret_cast<HANDLE>(-1) || h == nullptr) return ts;
+    HANDLE h = stream_console_handle(os);
+    if (h == nullptr) return ts;
     CONSOLE_SCREEN_BUFFER_INFO info;
     if (!GetConsoleScreenBufferInfo(h, &info)) return ts;
     int cols = info.srWindow.Right - info.srWindow.Left + 1;
