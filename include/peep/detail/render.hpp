@@ -28,9 +28,9 @@ struct RenderDecorators {
     bool show_colorbar;
 };
 
-template <typename GetPixelSource>
+template <typename PixelSource>
 void render_pixel_source(size_t rows, size_t cols, const RenderPlan& plan,
-                         GetPixelSource get_pixel_source,
+                         PixelSource source_pixel_at,
                          const RenderDecorators& decorators,
                          const Options& opts) {
     if (plan.empty) return;
@@ -45,10 +45,10 @@ void render_pixel_source(size_t rows, size_t cols, const RenderPlan& plan,
     const size_t out_c = plan.out_c;
     const bool resample = plan.resample;
 
-    auto pixel_at = [&](size_t mr, size_t mc) -> Pixel {
-        if (!resample) return get_pixel_source(mr, mc);
+    auto output_pixel_at = [&](size_t mr, size_t mc) -> Pixel {
+        if (!resample) return source_pixel_at(mr, mc);
         return sample_pixel_resampled(mr, mc, out_r, out_c, vr, vc,
-                                      get_pixel_source, opts.resampling());
+                                      source_pixel_at, opts.resampling());
     };
 
     std::ostringstream buf;
@@ -64,7 +64,7 @@ void render_pixel_source(size_t rows, size_t cols, const RenderPlan& plan,
         }
     }
 
-    emit_pixel_body(buf, out_r, out_c, bs, pixel_at);
+    emit_pixel_body(buf, out_r, out_c, bs, output_pixel_at);
 
     if (decorators.show_colorbar && decorators.colorbar_cmap) {
         emit_colorbar(buf, *decorators.colorbar_cmap, decorators.colorbar_lo,
@@ -74,8 +74,8 @@ void render_pixel_source(size_t rows, size_t cols, const RenderPlan& plan,
     os << buf.str();
 }
 
-template <typename GetSource>
-void render_scalar_source(size_t rows, size_t cols, GetSource get_source_abs,
+template <typename ScalarSource>
+void render_scalar_source(size_t rows, size_t cols, ScalarSource source_value_at,
                           const Options& opts) {
     const ColormapLut& cmap = resolve_colormap(opts);
     std::ostream& os = opts.ostream();
@@ -88,14 +88,14 @@ void render_scalar_source(size_t rows, size_t cols, GetSource get_source_abs,
     const size_t vr = plan.visible.rows;
     const size_t vc = plan.visible.cols;
 
-    auto get_source = [&](size_t sr, size_t sc) -> double {
+    auto visible_value_at = [&](size_t sr, size_t sc) -> double {
         size_t source_r = 0;
         size_t source_c = 0;
         if (!resolve_source_index(r0, sr, rows, source_r)
             || !resolve_source_index(c0, sc, cols, source_c)) {
             return std::numeric_limits<double>::quiet_NaN();
         }
-        return static_cast<double>(get_source_abs(source_r, source_c));
+        return static_cast<double>(source_value_at(source_r, source_c));
     };
 
     // Compute clim from visible region only.
@@ -104,7 +104,7 @@ void render_scalar_source(size_t rows, size_t cols, GetSource get_source_abs,
     bool auto_lo = std::isnan(lo);
     bool auto_hi = std::isnan(hi);
 
-    apply_auto_clim(vr, vc, get_source, lo, hi, auto_lo, auto_hi);
+    apply_auto_clim(vr, vc, visible_value_at, lo, hi, auto_lo, auto_hi);
 
     if (std::isinf(lo) || std::isinf(hi)) { lo = 0.0; hi = 1.0; }
     double range = (hi != lo) ? (hi - lo) : 1.0;
@@ -117,8 +117,8 @@ void render_scalar_source(size_t rows, size_t cols, GetSource get_source_abs,
         return n;
     };
 
-    auto pixel_source = [&](size_t sr, size_t sc) -> Pixel {
-        double v = get_source(sr, sc);
+    auto visible_pixel_at = [&](size_t sr, size_t sc) -> Pixel {
+        double v = visible_value_at(sr, sc);
         if (std::isnan(v) && !opts.has_nan_color()) return transparent_pixel();
         return opaque_pixel(color_for_value(v, cmap, opts, normalize(v)),
                             !std::isfinite(v));
@@ -131,7 +131,7 @@ void render_scalar_source(size_t rows, size_t cols, GetSource get_source_abs,
     decorators.colorbar_lo = lo;
     decorators.colorbar_hi = hi;
     decorators.show_colorbar = opts.show_colorbar();
-    render_pixel_source(rows, cols, plan, pixel_source, decorators, opts);
+    render_pixel_source(rows, cols, plan, visible_pixel_at, decorators, opts);
 }
 
 template <typename T>
@@ -139,17 +139,17 @@ void render(const T* data, size_t rows, size_t cols, const Options& opts) {
     if (!data) return;
     const bool col_major = (opts.layout() == Layout::ColMajor);
 
-    auto get_source = [&](size_t r, size_t c) -> double {
+    auto scalar_at = [&](size_t r, size_t c) -> double {
         if (col_major)
             return static_cast<double>(data[c * rows + r]);
         return static_cast<double>(data[r * cols + c]);
     };
 
-    render_scalar_source(rows, cols, get_source, opts);
+    render_scalar_source(rows, cols, scalar_at, opts);
 }
 
-template <typename GetSource>
-void render_rgb_source(size_t rows, size_t cols, GetSource get_source_abs,
+template <typename RgbSource>
+void render_rgb_source(size_t rows, size_t cols, RgbSource source_rgb_at,
                        const std::string& rgb_source, const Options& opts) {
     std::ostream& os = opts.ostream();
     prepare_terminal_output(os);
@@ -159,14 +159,14 @@ void render_rgb_source(size_t rows, size_t cols, GetSource get_source_abs,
     const std::ptrdiff_t r0 = plan.visible.r0;
     const std::ptrdiff_t c0 = plan.visible.c0;
 
-    auto pixel_source = [&](size_t sr, size_t sc) -> Pixel {
+    auto visible_pixel_at = [&](size_t sr, size_t sc) -> Pixel {
         size_t source_r = 0;
         size_t source_c = 0;
         if (!resolve_source_index(r0, sr, rows, source_r)
             || !resolve_source_index(c0, sc, cols, source_c)) {
             return opaque_pixel(RGB{0, 0, 0});
         }
-        return opaque_pixel(get_source_abs(source_r, source_c));
+        return opaque_pixel(source_rgb_at(source_r, source_c));
     };
 
     RenderDecorators decorators;
@@ -176,7 +176,7 @@ void render_rgb_source(size_t rows, size_t cols, GetSource get_source_abs,
     decorators.colorbar_lo = 0.0;
     decorators.colorbar_hi = 0.0;
     decorators.show_colorbar = false;
-    render_pixel_source(rows, cols, plan, pixel_source, decorators, opts);
+    render_pixel_source(rows, cols, plan, visible_pixel_at, decorators, opts);
 }
 
 inline void render_rgb(const std::uint8_t* data, size_t rows, size_t cols,
@@ -189,7 +189,7 @@ inline void render_rgb(const std::uint8_t* data, size_t rows, size_t cols,
         return col_major ? (c * rows + r) : (r * cols + c);
     };
 
-    auto get_source = [&](size_t r, size_t c) -> RGB {
+    auto rgb_at = [&](size_t r, size_t c) -> RGB {
         const size_t i = spatial_index(r, c);
         if (rgb_layout == RGBLayout::Planar) {
             return RGB{data[i], data[plane + i], data[2 * plane + i]};
@@ -198,7 +198,7 @@ inline void render_rgb(const std::uint8_t* data, size_t rows, size_t cols,
         return RGB{data[j], data[j + 1], data[j + 2]};
     };
 
-    render_rgb_source(rows, cols, get_source, rgb_layout_name(rgb_layout), opts);
+    render_rgb_source(rows, cols, rgb_at, rgb_layout_name(rgb_layout), opts);
 }
 
 inline void validate_vector_size(size_t size, size_t rows, size_t cols) {
