@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Debug
+          -DPEEP_BUILD_EXAMPLES=ON
+          -DPEEP_BUILD_TESTS=ON
+          -DPEEP_FETCH_GTEST=ON
+          -DPEEP_BUILD_BENCH=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Install
+        run: cmake --install build --prefix "$RUNNER_TEMP/peep-install"
+
+      - name: Configure package smoke test
+        run: >
+          cmake -S tests/package_smoke -B "$RUNNER_TEMP/peep-smoke"
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/peep-install"
+
+      - name: Build package smoke test
+        run: cmake --build "$RUNNER_TEMP/peep-smoke" --parallel
+
+      - name: Run package smoke test
+        run: "$RUNNER_TEMP/peep-smoke/package_smoke"
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install coverage tools
+        run: python3 -m pip install --user gcovr
+
+      - name: Configure coverage build
+        run: >
+          cmake -S . -B coverage-build
+          -DCMAKE_BUILD_TYPE=Debug
+          -DPEEP_BUILD_EXAMPLES=OFF
+          -DPEEP_BUILD_TESTS=ON
+          -DPEEP_FETCH_GTEST=ON
+          -DPEEP_BUILD_BENCH=OFF
+          -DCMAKE_CXX_FLAGS="--coverage -O0 -g"
+          -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+
+      - name: Build coverage target
+        run: cmake --build coverage-build --parallel
+
+      - name: Test coverage build
+        run: ctest --test-dir coverage-build --output-on-failure
+
+      - name: Generate coverage report
+        run: >
+          gcovr
+          --root .
+          --filter include/peep
+          --xml-pretty
+          --output coverage.xml
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false
+          verbose: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
