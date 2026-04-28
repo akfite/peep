@@ -125,6 +125,29 @@ peep::show(image.rows(), image.cols(), peep::Options()
 
 ![Expected terminal output from examples/17_rgb_accessor_field.cpp](assets/readme_17_rgb_accessor_field.svg)
 
+## Options
+
+`peep::Options` setters are chainable. Later calls to source, crop, colormap, and special-value color setters replace earlier calls of the same kind.
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| `clim(lo, hi)`, `clim_lo(v)`, `clim_hi(v)` | Auto from finite visible values | Set scalar color limits. Values outside the range clamp to the nearest endpoint; either limit can remain auto. |
+| `colormap(Colormap)`, `colormap("name")`, `colormap(lut)` | `default_colormap()` (`gray` initially) | Set the scalar palette. Names are `gray`/`grey`, `magma`, `viridis`, `plasma`, `inferno`, `cividis`, `coolwarm`, `gnuplot`, and `turbo`; custom LUTs are 256 RGB triplets/768 bytes. |
+| `nan_color(Color)`, `nan_color(r, g, b)`, `clear_nan_color()` | Unset | Render NaNs with a fixed RGB color, or clear the override so NaNs render as transparent space. |
+| `inf_color(...)`, `inf_colors(neg, pos)`, `neg_inf_color(...)`, `pos_inf_color(...)`, `clear_inf_colors()` | Unset | Override how infinities render. Without overrides, `-inf` and `+inf` use the low and high colormap endpoints. |
+| `block_size(s)` | Auto from `1` in terminals | Repeat each rendered pixel into an `s x s` block; `0` is treated as `1`. Setting this disables automatic upsampling of small images. |
+| `layout(Layout::RowMajor/ColMajor)` | `RowMajor` | Interpret flat scalar or RGB buffers as row-major or column-major. |
+| `ostream(os)` | `std::cout` | Send `show()` output to another stream. `to_string()` uses its own internal stream. |
+| `crop(x, y)`, `crop(x, y, w, h)`, `center_crop(cx, cy, w, h)` | Full image | Render from `(x, y)` to the end, a `w x h` window from `(x, y)`, or a centered window. Out-of-bounds scalar pixels become NaN; RGB pixels become black. |
+| `fit(Fit::Off/Resample/Trim)` | `Resample` | Control terminal overflow: render full size, downsample to fit, or keep the top-left portion that fits. Only active for terminal streams. |
+| `resampling(Resampling::Nearest/Bilinear)` | `Bilinear` | Choose the sampling kernel used by `Fit::Resample`. |
+| `scalar()` | Scalar data | Treat flat input as scalar values and clear accessors. |
+| `rgb(RGBLayout::Interleaved/Planar)` | Off, interleaved when enabled | Treat flat `std::uint8_t` input as RGB. Interleaved means `RGBRGB...`; planar means all red, then green, then blue. |
+| `accessor(fn)` | None | Use `fn(row, col)` as a scalar data source with `show(rows, cols, opts)` or `to_string(rows, cols, opts)`. |
+| `rgb_accessor(fn)` | None | Use `fn(row, col)` as an RGB data source returning `peep::Color`. |
+| `title()`, `title(false)`, `title(text)` | Off | Add or remove a one-line summary above the image; `title(text)` prefixes the summary with your label. |
+| `colorbar(bool enabled = true)` | On for scalar output | Show or hide the scalar colorbar. RGB rendering ignores colorbars. |
+
 ## Installation
 
 `peep` is header-only, so direct use is just:
