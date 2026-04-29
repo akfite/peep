@@ -59,6 +59,59 @@ jobs:
       - name: Run package smoke test
         run: ctest --test-dir "${{ runner.temp }}/peep-smoke" -C Debug --output-on-failure
 
+  release:
+    name: release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Configure Release
+        run: cmake --preset release
+
+      - name: Build Release
+        run: cmake --build --preset release --parallel
+
+      - name: Test Release
+        run: ctest --preset release
+
+      - name: Install Release
+        run: cmake --install build/release --prefix "${{ runner.temp }}/peep-release-install"
+
+      - name: Configure Release package smoke test
+        run: >
+          cmake -S tests/package_smoke -B "${{ runner.temp }}/peep-release-smoke"
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_PREFIX_PATH="${{ runner.temp }}/peep-release-install"
+
+      - name: Build Release package smoke test
+        run: cmake --build "${{ runner.temp }}/peep-release-smoke" --parallel
+
+      - name: Run Release package smoke test
+        run: ctest --test-dir "${{ runner.temp }}/peep-release-smoke" --output-on-failure
+
+  sanitize:
+    name: asan-ubsan
+    runs-on: ubuntu-latest
+
+    env:
+      ASAN_OPTIONS: detect_leaks=1
+      UBSAN_OPTIONS: print_stacktrace=1
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Configure sanitizers
+        run: cmake --preset sanitize
+
+      - name: Build sanitizers
+        run: cmake --build --preset sanitize --parallel
+
+      - name: Test sanitizers
+        run: ctest --preset sanitize
+
   coverage:
     name: coverage
     runs-on: ubuntu-latest
@@ -71,21 +124,13 @@ jobs:
         run: python3 -m pip install --user gcovr
 
       - name: Configure coverage build
-        run: >
-          cmake -S . -B coverage-build
-          -DCMAKE_BUILD_TYPE=Debug
-          -DPEEP_BUILD_EXAMPLES=OFF
-          -DPEEP_BUILD_TESTS=ON
-          -DPEEP_FETCH_GTEST=ON
-          -DPEEP_BUILD_BENCH=OFF
-          -DCMAKE_CXX_FLAGS="--coverage -O0 -g"
-          -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+        run: cmake --preset coverage
 
       - name: Build coverage target
-        run: cmake --build coverage-build --parallel
+        run: cmake --build --preset coverage --parallel
 
       - name: Test coverage build
-        run: ctest --test-dir coverage-build --output-on-failure
+        run: ctest --preset coverage
 
       - name: Generate coverage report
         run: >
