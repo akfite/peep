@@ -1,0 +1,122 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "dev",
+      "displayName": "Developer Debug",
+      "description": "Full Debug build with examples, tests, and benchmark target.",
+      "binaryDir": "${sourceDir}/build/dev",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "PEEP_BUILD_EXAMPLES": "ON",
+        "PEEP_BUILD_TESTS": "ON",
+        "PEEP_FETCH_GTEST": "ON",
+        "PEEP_BUILD_BENCH": "ON"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release",
+      "description": "Release build with examples, tests, and benchmark target.",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "PEEP_BUILD_EXAMPLES": "ON",
+        "PEEP_BUILD_TESTS": "ON",
+        "PEEP_FETCH_GTEST": "ON",
+        "PEEP_BUILD_BENCH": "ON"
+      }
+    },
+    {
+      "name": "sanitize",
+      "displayName": "Linux ASan/UBSan",
+      "description": "Linux Debug build with AddressSanitizer and UndefinedBehaviorSanitizer.",
+      "binaryDir": "${sourceDir}/build/sanitize",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "PEEP_BUILD_EXAMPLES": "OFF",
+        "PEEP_BUILD_TESTS": "ON",
+        "PEEP_FETCH_GTEST": "ON",
+        "PEEP_BUILD_BENCH": "OFF",
+        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer -O1 -g",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined"
+      }
+    },
+    {
+      "name": "coverage",
+      "displayName": "Coverage",
+      "description": "Linux coverage build used by the coverage CI job.",
+      "binaryDir": "${sourceDir}/build/coverage",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "PEEP_BUILD_EXAMPLES": "OFF",
+        "PEEP_BUILD_TESTS": "ON",
+        "PEEP_FETCH_GTEST": "ON",
+        "PEEP_BUILD_BENCH": "OFF",
+        "CMAKE_CXX_FLAGS": "--coverage -O0 -g",
+        "CMAKE_EXE_LINKER_FLAGS": "--coverage"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev",
+      "configuration": "Debug"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "configuration": "Release"
+    },
+    {
+      "name": "sanitize",
+      "configurePreset": "sanitize",
+      "configuration": "Debug"
+    },
+    {
+      "name": "coverage",
+      "configurePreset": "coverage",
+      "configuration": "Debug"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "sanitize",
+      "configurePreset": "sanitize",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "coverage",
+      "configurePreset": "coverage",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}
